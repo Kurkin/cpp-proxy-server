@@ -8,6 +8,8 @@
 
 /* Begin PBXBuildFile section */
 		531EE1E71BE4C665003E41EF /* main.cpp in Sources */ = {isa = PBXBuildFile; fileRef = 531EE1E61BE4C665003E41EF /* main.cpp */; };
+		531EE1EF1BE4F6DF003E41EF /* kqueue.cpp in Sources */ = {isa = PBXBuildFile; fileRef = 531EE1ED1BE4F6DF003E41EF /* kqueue.cpp */; };
+		53F0D5BD1BF46FA1009AB150 /* http_parser.cpp in Sources */ = {isa = PBXBuildFile; fileRef = 53F0D5BB1BF46FA1009AB150 /* http_parser.cpp */; };
 /* End PBXBuildFile section */
 
 /* Begin PBXCopyFilesBuildPhase section */
@@ -25,6 +27,10 @@
 /* Begin PBXFileReference section */
 		531EE1E31BE4C665003E41EF /* Proxy server */ = {isa = PBXFileReference; explicitFileType = "compiled.mach-o.executable"; includeInIndex = 0; path = "Proxy server"; sourceTree = BUILT_PRODUCTS_DIR; };
 		531EE1E61BE4C665003E41EF /* main.cpp */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.cpp.cpp; path = main.cpp; sourceTree = "<group>"; };
+		531EE1ED1BE4F6DF003E41EF /* kqueue.cpp */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.cpp.cpp; path = kqueue.cpp; sourceTree = "<group>"; };
+		531EE1EE1BE4F6DF003E41EF /* kqueue.hpp */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.cpp.h; path = kqueue.hpp; sourceTree = "<group>"; };
+		53F0D5BB1BF46FA1009AB150 /* http_parser.cpp */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.cpp.cpp; path = http_parser.cpp; sourceTree = "<group>"; };
+		53F0D5BC1BF46FA1009AB150 /* http_parser.hpp */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.cpp.h; path = http_parser.hpp; sourceTree = "<group>"; };
 /* End PBXFileReference section */
 
 /* Begin PBXFrameworksBuildPhase section */
@@ -58,6 +64,10 @@
 			isa = PBXGroup;
 			children = (
 				531EE1E61BE4C665003E41EF /* main.cpp */,
+				531EE1ED1BE4F6DF003E41EF /* kqueue.cpp */,
+				531EE1EE1BE4F6DF003E41EF /* kqueue.hpp */,
+				53F0D5BB1BF46FA1009AB150 /* http_parser.cpp */,
+				53F0D5BC1BF46FA1009AB150 /* http_parser.hpp */,
 			);
 			path = "Proxy server";
 			sourceTree = "<group>";
@@ -119,6 +129,8 @@
 			buildActionMask = 2147483647;
 			files = (
 				531EE1E71BE4C665003E41EF /* main.cpp in Sources */,
+				53F0D5BD1BF46FA1009AB150 /* http_parser.cpp in Sources */,
+				531EE1EF1BE4F6DF003E41EF /* kqueue.cpp in Sources */,
 			);
 			runOnlyForDeploymentPostprocessing = 0;
 		};
@@ -237,6 +249,7 @@
 				531EE1EC1BE4C665003E41EF /* Release */,
 			);
 			defaultConfigurationIsVisible = 0;
+			defaultConfigurationName = Release;
 		};
 /* End XCConfigurationList section */
 	};
