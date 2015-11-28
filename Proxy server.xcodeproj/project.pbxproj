@@ -9,7 +9,8 @@
 /* Begin PBXBuildFile section */
 		531EE1E71BE4C665003E41EF /* main.cpp in Sources */ = {isa = PBXBuildFile; fileRef = 531EE1E61BE4C665003E41EF /* main.cpp */; };
 		531EE1EF1BE4F6DF003E41EF /* kqueue.cpp in Sources */ = {isa = PBXBuildFile; fileRef = 531EE1ED1BE4F6DF003E41EF /* kqueue.cpp */; };
-		53F0D5BD1BF46FA1009AB150 /* http_parser.cpp in Sources */ = {isa = PBXBuildFile; fileRef = 53F0D5BB1BF46FA1009AB150 /* http_parser.cpp */; };
+		5398C81A1C03304900613071 /* utils.cpp in Sources */ = {isa = PBXBuildFile; fileRef = 5398C8181C03304900613071 /* utils.cpp */; };
+		53D43C811C0102A700936926 /* proxy.cpp in Sources */ = {isa = PBXBuildFile; fileRef = 53D43C7F1C0102A700936926 /* proxy.cpp */; };
 /* End PBXBuildFile section */
 
 /* Begin PBXCopyFilesBuildPhase section */
@@ -29,8 +30,10 @@
 		531EE1E61BE4C665003E41EF /* main.cpp */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.cpp.cpp; path = main.cpp; sourceTree = "<group>"; };
 		531EE1ED1BE4F6DF003E41EF /* kqueue.cpp */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.cpp.cpp; path = kqueue.cpp; sourceTree = "<group>"; };
 		531EE1EE1BE4F6DF003E41EF /* kqueue.hpp */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.cpp.h; path = kqueue.hpp; sourceTree = "<group>"; };
-		53F0D5BB1BF46FA1009AB150 /* http_parser.cpp */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.cpp.cpp; path = http_parser.cpp; sourceTree = "<group>"; };
-		53F0D5BC1BF46FA1009AB150 /* http_parser.hpp */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.cpp.h; path = http_parser.hpp; sourceTree = "<group>"; };
+		5398C8181C03304900613071 /* utils.cpp */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.cpp.cpp; name = utils.cpp; path = ../utils.cpp; sourceTree = "<group>"; };
+		5398C8191C03304900613071 /* utils.hpp */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.cpp.h; name = utils.hpp; path = ../utils.hpp; sourceTree = "<group>"; };
+		53D43C7F1C0102A700936926 /* proxy.cpp */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.cpp.cpp; path = proxy.cpp; sourceTree = "<group>"; };
+		53D43C801C0102A700936926 /* proxy.hpp */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.cpp.h; path = proxy.hpp; sourceTree = "<group>"; };
 /* End PBXFileReference section */
 
 /* Begin PBXFrameworksBuildPhase section */
@@ -66,8 +69,10 @@
 				531EE1E61BE4C665003E41EF /* main.cpp */,
 				531EE1ED1BE4F6DF003E41EF /* kqueue.cpp */,
 				531EE1EE1BE4F6DF003E41EF /* kqueue.hpp */,
-				53F0D5BB1BF46FA1009AB150 /* http_parser.cpp */,
-				53F0D5BC1BF46FA1009AB150 /* http_parser.hpp */,
+				53D43C7F1C0102A700936926 /* proxy.cpp */,
+				53D43C801C0102A700936926 /* proxy.hpp */,
+				5398C8181C03304900613071 /* utils.cpp */,
+				5398C8191C03304900613071 /* utils.hpp */,
 			);
 			path = "Proxy server";
 			sourceTree = "<group>";
@@ -128,8 +133,9 @@
 			isa = PBXSourcesBuildPhase;
 			buildActionMask = 2147483647;
 			files = (
+				53D43C811C0102A700936926 /* proxy.cpp in Sources */,
+				5398C81A1C03304900613071 /* utils.cpp in Sources */,
 				531EE1E71BE4C665003E41EF /* main.cpp in Sources */,
-				53F0D5BD1BF46FA1009AB150 /* http_parser.cpp in Sources */,
 				531EE1EF1BE4F6DF003E41EF /* kqueue.cpp in Sources */,
 			);
 			runOnlyForDeploymentPostprocessing = 0;
@@ -159,7 +165,7 @@
 				DEBUG_INFORMATION_FORMAT = dwarf;
 				ENABLE_STRICT_OBJC_MSGSEND = YES;
 				ENABLE_TESTABILITY = YES;
-				GCC_C_LANGUAGE_STANDARD = gnu99;
+				GCC_C_LANGUAGE_STANDARD = gnu11;
 				GCC_DYNAMIC_NO_PIC = NO;
 				GCC_NO_COMMON_BLOCKS = YES;
 				GCC_OPTIMIZATION_LEVEL = 0;
@@ -173,9 +179,11 @@
 				GCC_WARN_UNINITIALIZED_AUTOS = YES_AGGRESSIVE;
 				GCC_WARN_UNUSED_FUNCTION = YES;
 				GCC_WARN_UNUSED_VARIABLE = YES;
+				GENERATE_PROFILING_CODE = NO;
 				MACOSX_DEPLOYMENT_TARGET = 10.11;
 				MTL_ENABLE_DEBUG_INFO = YES;
 				ONLY_ACTIVE_ARCH = YES;
+				SCAN_ALL_SOURCE_FILES_FOR_INCLUDES = NO;
 				SDKROOT = macosx;
 			};
 			name = Debug;
@@ -202,16 +210,19 @@
 				DEBUG_INFORMATION_FORMAT = "dwarf-with-dsym";
 				ENABLE_NS_ASSERTIONS = NO;
 				ENABLE_STRICT_OBJC_MSGSEND = YES;
-				GCC_C_LANGUAGE_STANDARD = gnu99;
+				GCC_C_LANGUAGE_STANDARD = gnu11;
 				GCC_NO_COMMON_BLOCKS = YES;
+				GCC_OPTIMIZATION_LEVEL = s;
 				GCC_WARN_64_TO_32_BIT_CONVERSION = YES;
 				GCC_WARN_ABOUT_RETURN_TYPE = YES_ERROR;
 				GCC_WARN_UNDECLARED_SELECTOR = YES;
 				GCC_WARN_UNINITIALIZED_AUTOS = YES_AGGRESSIVE;
 				GCC_WARN_UNUSED_FUNCTION = YES;
 				GCC_WARN_UNUSED_VARIABLE = YES;
+				GENERATE_PROFILING_CODE = NO;
 				MACOSX_DEPLOYMENT_TARGET = 10.11;
 				MTL_ENABLE_DEBUG_INFO = NO;
+				SCAN_ALL_SOURCE_FILES_FOR_INCLUDES = NO;
 				SDKROOT = macosx;
 			};
 			name = Release;

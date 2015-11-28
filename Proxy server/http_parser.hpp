@@ -13,15 +13,31 @@
 #include <netdb.h>
 #include <arpa/inet.h>
 #include <err.h>
+#include <map>
+#include <string.h>
+#include <assert.h>
 
-struct request {
-    struct in_addr **addr_list;
-    std::string host_name;
-    std::string mes;
+//typedef std::pair<std::string::iterator, std::string::iterator> sub_string;
+
+struct Request {
     
-    request(char* message, size_t length);
-};
+//    sub_string method1;
+//    sub_string URI2;
+//    sub_string version2;
+    std::string text;
+    
+    std::string method;
+    std::string URI;
+    std::string version;
+    std::string body;
+    std::map<std::string, std::string> headers;
+    int client;
+    
+    in_addr addr_list; //  TODO: make a list
+        
+    Request(char* message, size_t length, int client);
 
-int drop(std::string substr, std::string* string);
+    std::string get_request();
+};
 
 #endif /* http_parser_hpp */

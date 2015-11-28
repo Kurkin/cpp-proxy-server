@@ -8,46 +8,44 @@
 
 #include "http_parser.hpp"
 
-request::request(char* message, size_t length) {
-    mes = std::string(message, length);
-    size_t host = mes.find("Host:") + 6;
-    size_t endhost = mes.find("\n", host);
-    host_name = mes.substr(host, endhost - host - 1);
-    printf("HOST NAME IS %s\n", host_name.c_str());
+Request::Request(char* message, size_t length, int client): text(message, length), client(client) {
     
-//  Drop: Proxy-Connection: keep=alive
-    drop("Proxy-Connection: keep-alive", &mes);
-//  DROP:  Connection: keep-alive
-    drop("Connection: keep-alive", &mes);
-    mes.resize(mes.size() - 2);
+//    auto end = std::find_if(text.begin(), text.end(), [](char a) {
+//        return a == '\n' || a == '\r' || a == ' ';
+//    });
+//    
+//    method1 = std::make_pair(text.begin(), end);
+//    if (std::string(method1.first, method1.second) != "POST" || std::string(method1.first, method1.second) != "GET") {
+//        throw "Trash in request";
+//    }
     
-    mes += "Connection: close\n\n";
+    body = text.substr(text.find("\r\n\r\n") + 4);
     
-    const char* address = host_name.c_str();
+    std::cerr << body << "\n";
     
-    printf("resolving %s\n", address);
-    
-    struct hostent *addr;
-    
-    if ((addr = gethostbyname(address)) == NULL) {
-        errx(1, "error");
+    method = strtok(message, "\n\r ");
+    URI = strtok(NULL, "\n\r ");
+    version = strtok(NULL, "\n\r ");
+    char* line = strtok(NULL, "\n\r");
+    while (line != NULL) {
+        std::string l(line);
+        size_t pos;
+        std::string name;
+        if ((pos = l.find(": ")) != std::string::npos) {
+            name = l.substr(0, pos);
+            l.erase(0, pos + 2);
+            std::string value = l;
+            headers.insert(std::pair<std::string, std::string>(name, value));
+        }
+        line = strtok(NULL, "\n\r");
     }
     
-    printf("IP addresses: ");
-    addr_list = (struct in_addr **)addr->h_addr_list;
-    for(size_t i = 0; addr_list[i] != NULL; i++) {
-        printf("%s ", inet_ntoa(*addr_list[i]));
+    if (headers.find("Content-Length") != headers.end()) {
+        std::cout << body.length() << " " << std::stoi(headers.at("Content-Length")) << "\n";
+        assert(body.length() == std::stoi(headers.at("Content-Length")));
     }
-    printf("\n");
 }
 
-
-int drop(std::string substr, std::string* string) {
-    size_t start = string->find(substr);
-    if (start == std::string::npos) {
-        return -1;
-    }
-    size_t end = string->find("\n", start);
-    string = &string->erase(start, end - start + 1);
-    return 0;
+std::string Request::get_request() {
+    return text;
 }
