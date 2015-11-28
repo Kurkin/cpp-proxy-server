@@ -14,13 +14,17 @@ io_queue::io_queue() {
     ident = kqueue();
 }
 
-void io_queue::add_event_handler(uintptr_t ident, int16_t filter, funct_t funct, void* udata) {
-    add_event_handler(ident, filter, 0, funct, udata);
+void io_queue::hard_stop() {
+    finished = true;
 }
 
-void io_queue::add_event_handler(uintptr_t ident, int16_t filter, uint16_t flags, funct_t funct, void* udata) {
+void io_queue::add_event_handler(uintptr_t ident, int16_t filter, funct_t funct) {
+    add_event_handler(ident, filter, 0, funct);
+}
+
+void io_queue::add_event_handler(uintptr_t ident, int16_t filter, uint16_t flags, funct_t funct) {
     struct kevent event;
-    EV_SET(&event, ident, filter, EV_ADD|flags, 0, 0, udata);
+    EV_SET(&event, ident, filter, EV_ADD|flags, 0, 0, NULL);
     int fail = kevent(this->ident, &event, 1, NULL, 0, NULL);
     if (fail) {
         perror("Adding in queue error");
@@ -57,7 +61,7 @@ void io_queue::watch_loop() {
     size_t const evListSize = 256;
     struct kevent evList[evListSize];
     
-    while (true) {
+    while (!finished) {
         int new_events = kevent(ident, NULL, 0, evList, evListSize, NULL);
         if (new_events == -1) {
             switch (errno) {
@@ -71,7 +75,10 @@ void io_queue::watch_loop() {
             }
             continue;
         }
-        for (size_t i = 0; i < new_events; i++) {
+        
+//        std::cout << "in cycle\n";
+        
+        for (size_t i = 0; i < new_events && !finished; i++) {
             std::pair<uintptr_t, int16_t> event(evList[i].ident, evList[i].filter);
             if (events_handlers.find(event) != events_handlers.end()) {
                 funct_t funct = events_handlers.at(event);
