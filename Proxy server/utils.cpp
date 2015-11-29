@@ -34,6 +34,13 @@ client_t::client_t(in_addr address) {
     const int set = 1;
     setsockopt(socket, SOL_SOCKET, SO_NOSIGPIPE, &set, sizeof(set));  // NOSIGPIPE FOR SEND
     
+    int flags;
+    if (-1 == (flags = fcntl(socket, F_GETFL, 0)))
+        flags = 0;
+    if (fcntl(socket, F_SETFL, flags | O_NONBLOCK) == -1) {
+        perror("seting non block error");
+    }
+    
     sockaddr_in server;
     server.sin_family = AF_INET;
     server.sin_addr.s_addr = inet_addr(inet_ntoa(address));

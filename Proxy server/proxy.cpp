@@ -97,8 +97,11 @@ void proxy_server::tcp_connection::add_request_text(std::string text) {
 }
 
 void proxy_server::tcp_connection::make_request() {
-    write(get_server_sock(), client->request.c_str(), client->request.length());
-    client->request = "";
+    parent->queue.add_event_handler(get_server_sock(), EVFILT_WRITE, [this](struct kevent event){
+        write(get_server_sock(), client->request.c_str(), client->request.length());
+        client->request = "";
+        parent->queue.delete_event_handler(get_server_sock(), EVFILT_WRITE);
+    });
 }
 
 void proxy_server::tcp_connection::server_handler(struct kevent event) {

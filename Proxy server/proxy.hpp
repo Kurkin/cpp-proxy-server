@@ -47,6 +47,8 @@ public:
     void resolve(parse_state* connection);
     
     std::function<void()> resolver = [&](){
+        
+        lru_cache<std::string, in_addr> cache(1000);
         while (true) {
             std::unique_lock<std::mutex> lk(queue_mutex);
             queue_cond.wait(lk, [&]{return queue_ready;});
@@ -73,6 +75,23 @@ public:
                 name.erase(name.find(":"));
             }
             
+            if (cache.contain(name)) {
+                std::cout << "CACHE! \n"; 
+                std::unique_lock<std::mutex> lk1(ans_mutex);
+                std::unique_lock<std::mutex> lk2(state);
+                if (!parse_ed->canceled) {
+                    parse_ed->connection->set_addr(cache.get(name));
+                } else {
+                    delete parse_ed;
+                    continue;
+                }
+                ans.push_back(parse_ed);
+                queue.trigger_user_event_handler(USER_EVENT_IDENT);
+                lk2.unlock();
+                lk1.unlock();
+                continue;
+            }
+            
             struct hostent* addr;
             
             if ((addr = gethostbyname(name.c_str())) == NULL) {
@@ -86,6 +105,7 @@ public:
             std::unique_lock<std::mutex> lk2(state);
                 if (!parse_ed->canceled) {
                     parse_ed->connection->set_addr(*(in_addr*)addr->h_addr_list[0]);
+                    cache.put(name, *(in_addr*)addr->h_addr_list[0]);
                 } else {
                     delete parse_ed;
                     continue;
@@ -122,6 +142,8 @@ public:
         parse_ed -> connection -> make_request();
         
         tcp_connection* temp = parse_ed -> connection;
+        temp -> state = nullptr;
+        delete parse_ed;
         
         queue.add_event_handler(parse_ed -> connection->get_server_sock(), EVFILT_READ, [temp](struct kevent event){
             temp -> server_handler(event);
@@ -131,8 +153,7 @@ public:
             temp -> client_handler(event);
         });
         
-        parse_ed -> connection -> state = nullptr;
-        delete parse_ed;
+        
         
         std::unique_lock<std::mutex> lk2(ans_mutex);
         if (ans.size() != 0) {
@@ -168,7 +189,6 @@ private:
     public:
         tcp_connection(client_t* client, proxy_server* parent) : client(new tcp_client(client)), parent(parent) {};
         ~tcp_connection() { std::cout << "tcp_connect deleted\n"; };
-        void set_server(client_t* client);
         int get_client_sock() { return client->get_socket(); };
         int get_server_sock() { return server->get_socket(); };
         std::string get_host() { return client->host; }
