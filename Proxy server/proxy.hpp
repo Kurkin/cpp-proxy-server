@@ -26,13 +26,16 @@ struct proxy_server {
     
 private:
     struct tcp_connection;
-    std::list<tcp_connection*> host_names;
+    struct parse_state;
+    std::list<parse_state*> host_names;
     std::mutex queue_mutex;
     std::condition_variable queue_cond;
     bool queue_ready;
     
     std::mutex ans_mutex;
-    std::list<tcp_connection*> ans;
+    std::list<parse_state*> ans;
+    
+    std::mutex state;
     
     server_t* server;
     
@@ -41,26 +44,31 @@ private:
 public:
     proxy_server(io_queue queue, int port);
     
-    void resolve(tcp_connection* connection);
+    void resolve(parse_state* connection);
     
     std::function<void()> resolver = [&](){
         while (true) {
             std::unique_lock<std::mutex> lk(queue_mutex);
             queue_cond.wait(lk, [&]{return queue_ready;});
             
-            tcp_connection* connection = host_names.front();
+            parse_state* parse_ed = host_names.front();
             host_names.pop_front();
             if (host_names.size() == 0) {
                 queue_ready = false;
             }
             lk.unlock();
             
-            if (!connection->alive) {
-                continue;
+            std::string name;
+            {
+                std::unique_lock<std::mutex> lk1(state);
+                if (!parse_ed->canceled) {
+                    name = parse_ed->connection->get_host();
+                } else {
+                    delete parse_ed;
+                    continue;
+                }
             }
-            
-            std::string name = connection->get_host();
-        
+
             if (name.find(":") != std::string::npos) {
                 name.erase(name.find(":"));
             }
@@ -73,46 +81,63 @@ public:
                 continue; //resolve error, just skip this host
             }
             
-            connection->set_addr(*(in_addr*)addr->h_addr_list[0]);
             
             std::unique_lock<std::mutex> lk1(ans_mutex);
-            if (connection->alive) {
-                ans.push_back(connection);
-            }
+            std::unique_lock<std::mutex> lk2(state);
+                if (!parse_ed->canceled) {
+                    parse_ed->connection->set_addr(*(in_addr*)addr->h_addr_list[0]);
+                } else {
+                    delete parse_ed;
+                    continue;
+                }
+                ans.push_back(parse_ed);
+                queue.trigger_user_event_handler(USER_EVENT_IDENT);
+            lk2.unlock();
             lk1.unlock();
-            
-            queue.trigger_user_event_handler(USER_EVENT_IDENT);
             
             queue_cond.notify_one();
         }
     };
     
-    tcp_connection* get_next() {
+    parse_state* get_next() {
         std::unique_lock<std::mutex> lk1(ans_mutex);
-        tcp_connection* connection = ans.front();
+        parse_state* connection = ans.front();
         ans.pop_front();
         return connection;
     }
     
     funct_t host_resolfed_f = [&](struct kevent event){
 
-        tcp_connection* connection = get_next();
-        connection -> connect_to_server();
-        connection -> make_request();
+        parse_state* parse_ed = get_next();
         
-        queue.add_event_handler(connection->get_server_sock(), EVFILT_READ, [connection](struct kevent event){
-            connection->server_handler(event);
+        {
+            std::unique_lock<std::mutex> lk1(state);
+            if (parse_ed->canceled) {
+                delete parse_ed;
+                return;
+            }
+        }
+        
+        parse_ed -> connection -> connect_to_server();
+        parse_ed -> connection -> make_request();
+        
+        tcp_connection* temp = parse_ed -> connection;
+        
+        queue.add_event_handler(parse_ed -> connection->get_server_sock(), EVFILT_READ, [temp](struct kevent event){
+            temp -> server_handler(event);
         });
         
-        queue.add_event_handler(connection->get_client_sock(), EVFILT_READ, [connection](struct kevent event){
-            connection->client_handler(event);
+        queue.add_event_handler(parse_ed -> connection->get_client_sock(), EVFILT_READ, [temp](struct kevent event){
+            temp -> client_handler(event);
         });
+        
+        parse_ed -> connection -> state = nullptr;
+        delete parse_ed;
         
         std::unique_lock<std::mutex> lk2(ans_mutex);
         if (ans.size() != 0) {
             queue.trigger_user_event_handler(USER_EVENT_IDENT);
         }
-        
     };
     
     funct_t connect_client_f = [&](struct kevent event) {
@@ -125,6 +150,11 @@ public:
     
 private:
     
+    struct parse_state {
+        parse_state(tcp_connection* connection) : connection(connection) {};
+        tcp_connection* connection;
+        bool canceled = false;
+    };
     
     struct tcp_connection {
         
@@ -137,7 +167,7 @@ private:
         
     public:
         tcp_connection(client_t* client, proxy_server* parent) : client(new tcp_client(client)), parent(parent) {};
-        ~tcp_connection() {};
+        ~tcp_connection() { std::cout << "tcp_connect deleted\n"; };
         void set_server(client_t* client);
         int get_client_sock() { return client->get_socket(); };
         int get_server_sock() { return server->get_socket(); };
@@ -147,18 +177,8 @@ private:
         void make_request();
         void server_handler(struct kevent event);
         void client_handler(struct kevent event);
-        void server_listener_f(struct kevent event) {
-            if (event.flags & EV_EOF && event.data == 0) {
-                delete server;
-            } else {
-                char buff[BUFF_SIZE];
-                size_t size = read(get_client_sock(), buff, BUFF_SIZE);
-                send(get_server_sock(), buff, size, 0);
-            }
-        }
-
         
-        bool alive = true;
+        parse_state* state = nullptr;
         
     private:
         
@@ -167,7 +187,10 @@ private:
 
         struct tcp_client {
             tcp_client(client_t* client) : socket(client) {};
-            ~tcp_client() { delete socket; };
+            ~tcp_client() {
+                std::cout << socket->get_socket() << " client deleted\n";
+                delete socket;
+            };
             
             client_t* socket;
             
@@ -180,7 +203,10 @@ private:
         
         struct tcp_server {
             tcp_server(client_t* socket) : socket(socket) {};
-            ~tcp_server() { delete socket; };
+            ~tcp_server() {
+                std::cout << socket->get_socket() << " server deleted\n";
+                delete socket;
+            };
             
             client_t* socket;
             

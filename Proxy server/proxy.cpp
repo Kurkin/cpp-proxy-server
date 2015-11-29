@@ -9,7 +9,7 @@
 #include "proxy.hpp"
 
 
-void proxy_server::resolve(tcp_connection* client) {
+void proxy_server::resolve(parse_state* client) {
     std::lock_guard<std::mutex> lk(queue_mutex);
     host_names.push_back(client);
     queue_ready = true;
@@ -26,11 +26,14 @@ proxy_server::proxy_server(io_queue queue, int port): queue(queue) {
 
 void proxy_server::tcp_connection::client_handler(struct kevent event) {
     if (event.flags & EV_EOF) {
-        std::cout << "client " << get_client_sock() << " disconnected\n";
-        delete client;
+        std::cout << "EV_EOF from " << event.ident << " client\n";
+        std::unique_lock<std::mutex> lk(parent->state);
+        if (state) state->canceled = true;
+        lk.unlock();
         parent->queue.delete_event_handler(get_client_sock(), EVFILT_READ);
-        delete server;
-        parent->queue.delete_event_handler(get_server_sock(), EVFILT_READ);
+        delete client;
+        if (server) parent->queue.delete_event_handler(get_server_sock(), EVFILT_READ);
+        if (server) delete server;
         delete this;
     } else {
         read_request_f(event);
@@ -39,13 +42,15 @@ void proxy_server::tcp_connection::client_handler(struct kevent event) {
 
 void proxy_server::tcp_connection::read_request_f(struct kevent event) {
     if (server != nullptr) {
-        delete server;
+        std::cout << "delete old server" << get_server_sock() << "\n";
         parent->queue.delete_event_handler(get_server_sock(), EVFILT_READ);
+        delete server;
         server = nullptr;
     }
 
     char buff[BUFF_SIZE];
 
+    std::cout << "read request of " << event.ident << "\n";
     size_t size = read(get_client_sock(), buff, BUFF_SIZE);
     if (size == -1) {
         perror("read error");
@@ -60,14 +65,13 @@ void proxy_server::tcp_connection::add_request_text(std::string text) {
     client->request.append(text);
 
     size_t end_of_header = client->request.find("\r\n\r\n");
-
     
     if (end_of_header == std::string::npos) {
         return;
     }
     
     std::string body = client->request.substr(end_of_header + 4);
-
+    
     std::string method = client->request.substr(0, client->request.find(" "));
 
     size_t host_start = client->request.find("Host: ") + strlen("Host: ");
@@ -81,13 +85,14 @@ void proxy_server::tcp_connection::add_request_text(std::string text) {
         size_t content_len_end = client->request.find("\r\n", content_len_start);
         content_len = client->request.substr(content_len_start, content_len_end - content_len_start);
         if (body.length() == std::stoi(content_len)) {
-            parent->resolve(this);
-        } else {
-            std::cout << body << "\n";
-            std::cout << body.size() << " body " << std::stoi(content_len) << " content_len\n";
+            if (state) delete state;
+            state = new parse_state(this);
+            parent->resolve(state);
         }
     } else {
-        parent->resolve(this);
+        if (state) delete state;
+        state = new parse_state(this);
+        parent->resolve(state);
     }
 }
 
@@ -98,12 +103,15 @@ void proxy_server::tcp_connection::make_request() {
 
 void proxy_server::tcp_connection::server_handler(struct kevent event) {
     if (event.flags & EV_EOF && event.data == 0) {
-        delete server;
+        std::cout << "EV_EOF from " << event.ident << " server\n";
         parent->queue.delete_event_handler(get_server_sock(), EVFILT_READ);
+        delete server;
         server = nullptr;
     } else {
-        char buff[BUFF_SIZE];
-        size_t size = read(get_server_sock(), buff, BUFF_SIZE);
+        char buff[event.data + 10];
+        std::cout << event.ident << "pre trans \n";
+        std::cout << "transfer from " << get_server_sock() << " to " << get_client_sock() << "\n";
+        size_t size = read(get_server_sock(), buff, event.data + 10);
         write(get_client_sock(), buff, size);
     }
 }

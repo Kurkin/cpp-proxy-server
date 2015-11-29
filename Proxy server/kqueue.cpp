@@ -39,11 +39,7 @@ void io_queue::add_event_handler(uintptr_t ident, int16_t filter, uint16_t flags
 void io_queue::delete_event_handler(uintptr_t ident, int16_t filter) {
     struct kevent event;
     EV_SET(&event, ident, filter, EV_DELETE, 0, 0, NULL);
-    int fail = kevent(this->ident, &event, 1, NULL, 0, NULL);
-    if (fail) {
-        perror("Deleting from queue error");
-        throw "Deletng event handler from io_queue error";
-    }
+    kevent(this->ident, &event, 1, NULL, 0, NULL);
     events_handlers.erase(std::pair<uintptr_t, int16_t>(ident, filter));
 }
 
@@ -76,8 +72,8 @@ void io_queue::watch_loop() {
             continue;
         }
         
-//        std::cout << "in cycle\n";
-        
+        std::cout << "in cycle\n";
+
         for (size_t i = 0; i < new_events && !finished; i++) {
             std::pair<uintptr_t, int16_t> event(evList[i].ident, evList[i].filter);
             if (events_handlers.find(event) != events_handlers.end()) {
