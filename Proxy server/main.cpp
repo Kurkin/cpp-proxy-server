@@ -16,11 +16,10 @@
 #include <assert.h>
 
 #include "kqueue.hpp"
-#include "http_parser.hpp"
 #include "proxy.hpp"
 
-int main(int argc, const char * argv[]) {
-  
+int main(int argc, const char * argv[])
+{  
     io_queue queue;
     
     proxy_server proxy(queue, 2540);

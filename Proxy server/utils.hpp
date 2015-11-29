@@ -20,12 +20,13 @@
 #include <unordered_map>
 #include <list>
 #include <fcntl.h>
+#include "throw_error.h"
 
-struct server_t {
-    server_t(int port);
-    ~server_t();
+struct server_socket {
+    server_socket(int port);
+    ~server_socket() { close(socket); };
     
-    int get_socket();
+    int get_socket() { return socket; };
     void bind_and_listen();
     
 private:
@@ -33,13 +34,13 @@ private:
     int port;
 };
 
-struct client_t {
+struct client_socket {
     
-    client_t(in_addr address); // for connect;
-    client_t(server_t* server); // for accept
-    ~client_t();
+    client_socket(in_addr address); // for connect;
+    client_socket(server_socket* server); // for accept
+    ~client_socket() { close(socket); };
     
-    int get_socket();
+    int get_socket() { return socket; };
     
 private:
     int socket;

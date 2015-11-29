@@ -58,11 +58,11 @@
             ignoreCount = "0"
             continueAfterRunningActions = "No"
             filePath = "Proxy server/proxy.hpp"
-            timestampString = "470499095.852519"
+            timestampString = "470523175.961908"
             startingColumnNumber = "9223372036854775807"
             endingColumnNumber = "9223372036854775807"
-            startingLineNumber = "164"
-            endingLineNumber = "164">
+            startingLineNumber = "163"
+            endingLineNumber = "163">
             <Locations>
                <Location
                   shouldBeEnabled = "Yes"
@@ -72,11 +72,11 @@
                   moduleName = "Proxy server"
                   usesParentBreakpointCondition = "Yes"
                   urlString = "file:///Users/kurkin/cpp/Proxy%20server/Proxy%20server/proxy.hpp"
-                  timestampString = "470491235.39942"
+                  timestampString = "470523175.984638"
                   startingColumnNumber = "9223372036854775807"
                   endingColumnNumber = "9223372036854775807"
-                  startingLineNumber = "143"
-                  endingLineNumber = "143"
+                  startingLineNumber = "164"
+                  endingLineNumber = "164"
                   offsetFromSymbolStart = "1235">
                </Location>
                <Location
@@ -87,11 +87,11 @@
                   moduleName = "Proxy server"
                   usesParentBreakpointCondition = "Yes"
                   urlString = "file:///Users/kurkin/cpp/Proxy%20server/Proxy%20server/proxy.hpp"
-                  timestampString = "470491235.400027"
+                  timestampString = "470523175.985134"
                   startingColumnNumber = "9223372036854775807"
                   endingColumnNumber = "9223372036854775807"
-                  startingLineNumber = "144"
-                  endingLineNumber = "144"
+                  startingLineNumber = "165"
+                  endingLineNumber = "165"
                   offsetFromSymbolStart = "39">
                </Location>
             </Locations>

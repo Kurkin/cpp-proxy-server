@@ -10,6 +10,7 @@
 		531EE1E71BE4C665003E41EF /* main.cpp in Sources */ = {isa = PBXBuildFile; fileRef = 531EE1E61BE4C665003E41EF /* main.cpp */; };
 		531EE1EF1BE4F6DF003E41EF /* kqueue.cpp in Sources */ = {isa = PBXBuildFile; fileRef = 531EE1ED1BE4F6DF003E41EF /* kqueue.cpp */; };
 		5398C8321C0B284200613071 /* utils.cpp in Sources */ = {isa = PBXBuildFile; fileRef = 5398C8301C0B284200613071 /* utils.cpp */; };
+		5398C8981C0B95AC00613071 /* throw_error.cpp in Sources */ = {isa = PBXBuildFile; fileRef = 5398C8961C0B95AC00613071 /* throw_error.cpp */; };
 		53D43C811C0102A700936926 /* proxy.cpp in Sources */ = {isa = PBXBuildFile; fileRef = 53D43C7F1C0102A700936926 /* proxy.cpp */; };
 /* End PBXBuildFile section */
 
@@ -32,6 +33,8 @@
 		531EE1EE1BE4F6DF003E41EF /* kqueue.hpp */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.cpp.h; path = kqueue.hpp; sourceTree = "<group>"; };
 		5398C8301C0B284200613071 /* utils.cpp */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.cpp.cpp; path = utils.cpp; sourceTree = "<group>"; };
 		5398C8311C0B284200613071 /* utils.hpp */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.cpp.h; path = utils.hpp; sourceTree = "<group>"; };
+		5398C8961C0B95AC00613071 /* throw_error.cpp */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.cpp.cpp; path = throw_error.cpp; sourceTree = "<group>"; };
+		5398C8971C0B95AC00613071 /* throw_error.h */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.c.h; path = throw_error.h; sourceTree = "<group>"; };
 		53D43C7F1C0102A700936926 /* proxy.cpp */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.cpp.cpp; path = proxy.cpp; sourceTree = "<group>"; };
 		53D43C801C0102A700936926 /* proxy.hpp */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.cpp.h; path = proxy.hpp; sourceTree = "<group>"; };
 /* End PBXFileReference section */
@@ -68,6 +71,8 @@
 			children = (
 				5398C8301C0B284200613071 /* utils.cpp */,
 				5398C8311C0B284200613071 /* utils.hpp */,
+				5398C8961C0B95AC00613071 /* throw_error.cpp */,
+				5398C8971C0B95AC00613071 /* throw_error.h */,
 				531EE1E61BE4C665003E41EF /* main.cpp */,
 				531EE1ED1BE4F6DF003E41EF /* kqueue.cpp */,
 				531EE1EE1BE4F6DF003E41EF /* kqueue.hpp */,
@@ -136,6 +141,7 @@
 				53D43C811C0102A700936926 /* proxy.cpp in Sources */,
 				531EE1E71BE4C665003E41EF /* main.cpp in Sources */,
 				531EE1EF1BE4F6DF003E41EF /* kqueue.cpp in Sources */,
+				5398C8981C0B95AC00613071 /* throw_error.cpp in Sources */,
 				5398C8321C0B284200613071 /* utils.cpp in Sources */,
 			);
 			runOnlyForDeploymentPostprocessing = 0;

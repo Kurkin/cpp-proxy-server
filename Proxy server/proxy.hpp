@@ -37,12 +37,13 @@ private:
     
     std::mutex state;
     
-    server_t* server;
+    server_socket* server;
     
     io_queue queue;
     
 public:
     proxy_server(io_queue queue, int port);
+    ~proxy_server();
     
     void resolve(parse_state* connection);
     
@@ -76,7 +77,6 @@ public:
             }
             
             if (cache.contain(name)) {
-                std::cout << "CACHE! \n"; 
                 std::unique_lock<std::mutex> lk1(ans_mutex);
                 std::unique_lock<std::mutex> lk2(state);
                 if (!parse_ed->canceled) {
@@ -145,11 +145,11 @@ public:
         temp -> state = nullptr;
         delete parse_ed;
         
-        queue.add_event_handler(parse_ed -> connection->get_server_sock(), EVFILT_READ, [temp](struct kevent event){
+        queue.add_event_handler(temp -> get_server_sock(), EVFILT_READ, [temp](struct kevent event){
             temp -> server_handler(event);
         });
         
-        queue.add_event_handler(parse_ed -> connection->get_client_sock(), EVFILT_READ, [temp](struct kevent event){
+        queue.add_event_handler(temp -> get_client_sock(), EVFILT_READ, [temp](struct kevent event){
             temp -> client_handler(event);
         });
         
@@ -162,7 +162,7 @@ public:
     };
     
     funct_t connect_client_f = [&](struct kevent event) {
-        tcp_connection* connection = new tcp_connection(new client_t(server), this);
+        tcp_connection* connection = new tcp_connection(new client_socket(server), this);
         std::cout << "client connected: " << connection->get_client_sock() << "\n";
         queue.add_event_handler(connection->get_client_sock(), EVFILT_READ, [connection](struct kevent event){
             connection->client_handler(event);
@@ -187,7 +187,7 @@ private:
         proxy_server* parent;
         
     public:
-        tcp_connection(client_t* client, proxy_server* parent) : client(new tcp_client(client)), parent(parent) {};
+        tcp_connection(client_socket* client, proxy_server* parent) : client(new tcp_client(client)), parent(parent) {};
         ~tcp_connection() { std::cout << "tcp_connect deleted\n"; };
         int get_client_sock() { return client->get_socket(); };
         int get_server_sock() { return server->get_socket(); };
@@ -206,13 +206,13 @@ private:
         void read_request_f(struct kevent event);
 
         struct tcp_client {
-            tcp_client(client_t* client) : socket(client) {};
+            tcp_client(client_socket* client) : socket(client) {};
             ~tcp_client() {
                 std::cout << socket->get_socket() << " client deleted\n";
                 delete socket;
             };
             
-            client_t* socket;
+            client_socket* socket;
             
             int get_socket() { return socket->get_socket(); };
             
@@ -222,13 +222,13 @@ private:
         };
         
         struct tcp_server {
-            tcp_server(client_t* socket) : socket(socket) {};
+            tcp_server(client_socket* socket) : socket(socket) {};
             ~tcp_server() {
                 std::cout << socket->get_socket() << " server deleted\n";
                 delete socket;
             };
             
-            client_t* socket;
+            client_socket* socket;
             
             int get_socket() {
                 return socket->get_socket();

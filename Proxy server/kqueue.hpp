@@ -15,7 +15,7 @@
 #include <sys/event.h>
 #include <map>
 #include <err.h>
-#include <assert.h>
+#include "throw_error.h"
 
 typedef std::function<void(struct kevent)> funct_t;
 

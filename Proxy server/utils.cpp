@@ -8,37 +8,38 @@
 
 #include "utils.hpp"
 
-
-client_t::client_t(server_t* server) {
-    
+client_socket::client_socket(server_socket* server)
+{
     struct sockaddr addr;
     socklen_t socklen = sizeof(addr);
     socket = accept(server->get_socket(), &addr, &socklen);
     if (socket == -1) {
-        perror("can't get accept client");
-        throw "Error in eccept client";
+        throw_error(errno, "accept()");
     }
     
     const int set = 1;
-    setsockopt(socket, SOL_SOCKET, SO_NOSIGPIPE, &set, sizeof(set));  // NOSIGPIPE FOR SEND
+    if (setsockopt(socket, SOL_SOCKET, SO_NOSIGPIPE, &set, sizeof(set)) == -1) { // NOSIGPIPE FOR SEND
+        throw_error(errno, "setsockopt()");
+    };
 }
 
-client_t::client_t(in_addr address) {
-    
+client_socket::client_socket(in_addr address)
+{
     socket = ::socket(AF_INET, SOCK_STREAM, 0);
     if (socket == -1) {
-        perror("cant open sock");
-        throw "can make new sock for server";
+        throw_error(errno, "socket()");
     }
     
     const int set = 1;
-    setsockopt(socket, SOL_SOCKET, SO_NOSIGPIPE, &set, sizeof(set));  // NOSIGPIPE FOR SEND
+    if (setsockopt(socket, SOL_SOCKET, SO_NOSIGPIPE, &set, sizeof(set)) == -1) { // NOSIGPIPE FOR SEND
+        throw_error(errno, "setsockopt()");
+    };
     
     int flags;
     if (-1 == (flags = fcntl(socket, F_GETFL, 0)))
         flags = 0;
     if (fcntl(socket, F_SETFL, flags | O_NONBLOCK) == -1) {
-        perror("seting non block error");
+        throw_error(errno, "fcntl()");
     }
     
     sockaddr_in server;
@@ -47,26 +48,20 @@ client_t::client_t(in_addr address) {
     server.sin_port = htons(80);
     std::cout << "trying connect to " << inet_ntoa(address) << "\n";
     if (connect(socket,  (sockaddr *)&server, sizeof(server)) < 0) {
-        perror("can't connect");
+        if (errno != EINPROGRESS) {
+            throw_error(errno, "connect()");
+        }
     }
     
     std::cout << "connected " << socket << " \n";
 }
 
-client_t::~client_t() {
-    close(socket);
-}
-
-int client_t::get_socket() {
-    return socket;
-}
-
-server_t::server_t(int port): port(port) {
+server_socket::server_socket(int port): port(port) {
     socket = ::socket(AF_INET, SOCK_STREAM, 0);
 }
 
-void server_t::bind_and_listen() {
-    
+void server_socket::bind_and_listen()
+{
     struct sockaddr_in server;
     server.sin_family = AF_INET;
     server.sin_port = htons(port);
@@ -74,18 +69,10 @@ void server_t::bind_and_listen() {
 
     int bnd = bind(socket, (sockaddr *)&server, sizeof(server));
     if (bnd == -1) {
-        perror("Cant bind port");
-        close(socket);
-        throw std::exception();
+        throw_error(errno, "bind()");
     }
     
     if (listen(socket, SOMAXCONN) != 0) {
-        close(socket);
-        perror("Cant listen");
-        throw std::exception();
+        throw_error(errno, "listen()");
     }
-}
-
-int server_t::get_socket() {
-    return socket;
 }

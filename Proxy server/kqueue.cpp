@@ -10,8 +10,12 @@
 
 std::map<std::pair<uintptr_t, int16_t>, funct_t> events_handlers;
 
-io_queue::io_queue() {
+io_queue::io_queue()
+{
     ident = kqueue();
+    if (ident == -1) {
+        throw_error(errno, "kqueue()");
+    }
 }
 
 void io_queue::hard_stop() {
@@ -27,8 +31,7 @@ void io_queue::add_event_handler(uintptr_t ident, int16_t filter, uint16_t flags
     EV_SET(&event, ident, filter, EV_ADD|flags, 0, 0, NULL);
     int fail = kevent(this->ident, &event, 1, NULL, 0, NULL);
     if (fail) {
-        perror("Adding in queue error");
-        throw "Adding event handler in io_queue error";
+        throw_error(errno, "kevent(EV_ADD)");
     }
     auto event_handler = std::pair<std::pair<uintptr_t, int16_t>, funct_t>
     (std::pair<uintptr_t, int16_t>(event.ident, event.filter),funct);
@@ -39,7 +42,11 @@ void io_queue::add_event_handler(uintptr_t ident, int16_t filter, uint16_t flags
 void io_queue::delete_event_handler(uintptr_t ident, int16_t filter) {
     struct kevent event;
     EV_SET(&event, ident, filter, EV_DELETE, 0, 0, NULL);
-    kevent(this->ident, &event, 1, NULL, 0, NULL);
+    int fail = kevent(this->ident, &event, 1, NULL, 0, NULL);
+    if (fail == -1) {
+        if (errno != ENOENT)
+            throw_error(errno, "kevent(EV_DALETE)");
+    }
     events_handlers.erase(std::pair<uintptr_t, int16_t>(ident, filter));
 }
 
@@ -48,8 +55,7 @@ void io_queue::trigger_user_event_handler(uintptr_t ident) {
     EV_SET(&event, ident, EVFILT_USER, 0, NOTE_TRIGGER, 0, NULL);
     int fail = kevent(this->ident, &event, 1, NULL, 0, NULL);
     if (fail) {
-        perror("Error in trigerring user event");
-        throw "Error in trigerring user event";
+        throw_error(errno, "kevent(NOTE_TRIGGER)");
     }
 }
 
@@ -65,8 +71,7 @@ void io_queue::watch_loop() {
                     // ignore;
                     break;
                 default:
-                    perror("kqueue error");
-                    errx(1, "kqueue error");
+                    throw_error(errno, "kevent()");
                     break;
             }
             continue;

@@ -17,11 +17,17 @@ void proxy_server::resolve(parse_state* client) {
 }
 
 proxy_server::proxy_server(io_queue queue, int port): queue(queue) {
-    server = new server_t(port);
+    server = new server_socket(port);
     server->bind_and_listen();
     
     queue.add_event_handler(server->get_socket(), EVFILT_READ, connect_client_f);
     queue.add_event_handler(USER_EVENT_IDENT, EVFILT_USER, EV_CLEAR, host_resolfed_f);
+}
+
+proxy_server::~proxy_server() {
+    queue.delete_event_handler(server->get_socket(), EVFILT_READ);
+    queue.delete_event_handler(USER_EVENT_IDENT, EVFILT_USER);
+    delete server;
 }
 
 void proxy_server::tcp_connection::client_handler(struct kevent event) {
@@ -111,14 +117,14 @@ void proxy_server::tcp_connection::server_handler(struct kevent event) {
         delete server;
         server = nullptr;
     } else {
-        char buff[event.data + 10];
-        std::cout << event.ident << "pre trans \n";
+        char buff[event.data];
+        std::cout << event.ident << " pre trans \n";
         std::cout << "transfer from " << get_server_sock() << " to " << get_client_sock() << "\n";
-        size_t size = read(get_server_sock(), buff, event.data + 10);
+        size_t size = read(get_server_sock(), buff, event.data);
         write(get_client_sock(), buff, size);
     }
 }
 
 void proxy_server::tcp_connection::connect_to_server() {
-    server = new tcp_server(new client_t(client->addr));
+    server = new tcp_server(new client_socket(client->addr));
 }
