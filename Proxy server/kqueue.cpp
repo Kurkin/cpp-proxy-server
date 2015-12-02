@@ -47,6 +47,7 @@ void io_queue::delete_event_handler(uintptr_t ident, int16_t filter) {
         if (errno != ENOENT)
             throw_error(errno, "kevent(EV_DALETE)");
     }
+    ident_is_valid = false;
     events_handlers.erase(std::pair<uintptr_t, int16_t>(ident, filter));
 }
 
@@ -80,10 +81,19 @@ void io_queue::watch_loop() {
         std::cout << "in cycle\n";
 
         for (size_t i = 0; i < new_events && !finished; i++) {
-            std::pair<uintptr_t, int16_t> event(evList[i].ident, evList[i].filter);
-            if (events_handlers.find(event) != events_handlers.end()) {
-                funct_t funct = events_handlers.at(event);
-                funct(evList[i]);
+            if (evList[i].ident != -1) {
+                std::pair<uintptr_t, int16_t> event(evList[i].ident, evList[i].filter);
+                if (events_handlers.find(event) != events_handlers.end()) {
+                    funct_t funct = events_handlers.at(event);
+                    funct(evList[i]);
+                    if (ident_is_valid == false) {
+                        for (size_t j = i; j < new_events; j++) {
+                            if (evList[j].ident == evList[i].ident) {
+                                evList[j].ident = -1;
+                            }
+                        }
+                    }
+                }
             }
         }
     }

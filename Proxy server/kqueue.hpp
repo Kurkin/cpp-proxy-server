@@ -34,6 +34,7 @@ struct io_queue {
     
 private:
     int ident;
+    bool ident_is_valid = true;
     bool finished = false;
 };
 

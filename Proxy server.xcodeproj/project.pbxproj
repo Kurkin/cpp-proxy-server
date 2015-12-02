@@ -9,6 +9,7 @@
 /* Begin PBXBuildFile section */
 		531EE1E71BE4C665003E41EF /* main.cpp in Sources */ = {isa = PBXBuildFile; fileRef = 531EE1E61BE4C665003E41EF /* main.cpp */; };
 		531EE1EF1BE4F6DF003E41EF /* kqueue.cpp in Sources */ = {isa = PBXBuildFile; fileRef = 531EE1ED1BE4F6DF003E41EF /* kqueue.cpp */; };
+		5337F6781C0ED0A600A7B412 /* http_handler.cpp in Sources */ = {isa = PBXBuildFile; fileRef = 5337F6761C0ED0A600A7B412 /* http_handler.cpp */; };
 		5398C8321C0B284200613071 /* utils.cpp in Sources */ = {isa = PBXBuildFile; fileRef = 5398C8301C0B284200613071 /* utils.cpp */; };
 		5398C8981C0B95AC00613071 /* throw_error.cpp in Sources */ = {isa = PBXBuildFile; fileRef = 5398C8961C0B95AC00613071 /* throw_error.cpp */; };
 		53D43C811C0102A700936926 /* proxy.cpp in Sources */ = {isa = PBXBuildFile; fileRef = 53D43C7F1C0102A700936926 /* proxy.cpp */; };
@@ -31,6 +32,8 @@
 		531EE1E61BE4C665003E41EF /* main.cpp */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.cpp.cpp; path = main.cpp; sourceTree = "<group>"; };
 		531EE1ED1BE4F6DF003E41EF /* kqueue.cpp */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.cpp.cpp; path = kqueue.cpp; sourceTree = "<group>"; };
 		531EE1EE1BE4F6DF003E41EF /* kqueue.hpp */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.cpp.h; path = kqueue.hpp; sourceTree = "<group>"; };
+		5337F6761C0ED0A600A7B412 /* http_handler.cpp */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.cpp.cpp; path = http_handler.cpp; sourceTree = "<group>"; };
+		5337F6771C0ED0A600A7B412 /* http_handler.hpp */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.cpp.h; path = http_handler.hpp; sourceTree = "<group>"; };
 		5398C8301C0B284200613071 /* utils.cpp */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.cpp.cpp; path = utils.cpp; sourceTree = "<group>"; };
 		5398C8311C0B284200613071 /* utils.hpp */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.cpp.h; path = utils.hpp; sourceTree = "<group>"; };
 		5398C8961C0B95AC00613071 /* throw_error.cpp */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.cpp.cpp; path = throw_error.cpp; sourceTree = "<group>"; };
@@ -78,6 +81,8 @@
 				531EE1EE1BE4F6DF003E41EF /* kqueue.hpp */,
 				53D43C7F1C0102A700936926 /* proxy.cpp */,
 				53D43C801C0102A700936926 /* proxy.hpp */,
+				5337F6761C0ED0A600A7B412 /* http_handler.cpp */,
+				5337F6771C0ED0A600A7B412 /* http_handler.hpp */,
 			);
 			path = "Proxy server";
 			sourceTree = "<group>";
@@ -140,6 +145,7 @@
 			files = (
 				53D43C811C0102A700936926 /* proxy.cpp in Sources */,
 				531EE1E71BE4C665003E41EF /* main.cpp in Sources */,
+				5337F6781C0ED0A600A7B412 /* http_handler.cpp in Sources */,
 				531EE1EF1BE4F6DF003E41EF /* kqueue.cpp in Sources */,
 				5398C8981C0B95AC00613071 /* throw_error.cpp in Sources */,
 				5398C8321C0B284200613071 /* utils.cpp in Sources */,
@@ -218,7 +224,7 @@
 				ENABLE_STRICT_OBJC_MSGSEND = YES;
 				GCC_C_LANGUAGE_STANDARD = gnu11;
 				GCC_NO_COMMON_BLOCKS = YES;
-				GCC_OPTIMIZATION_LEVEL = s;
+				GCC_OPTIMIZATION_LEVEL = 0;
 				GCC_WARN_64_TO_32_BIT_CONVERSION = YES;
 				GCC_WARN_ABOUT_RETURN_TYPE = YES_ERROR;
 				GCC_WARN_UNDECLARED_SELECTOR = YES;

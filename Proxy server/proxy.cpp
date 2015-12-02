@@ -7,7 +7,8 @@
 //
 
 #include "proxy.hpp"
-
+#include "http_handler.hpp"
+#include <assert.h>
 
 void proxy_server::resolve(parse_state* client) {
     std::lock_guard<std::mutex> lk(queue_mutex);
@@ -76,21 +77,13 @@ void proxy_server::tcp_connection::add_request_text(std::string text) {
         return;
     }
     
-    std::string body = client->request.substr(end_of_header + 4);
+    request req(client->request);
+
+    client->host = req.get_header("Host");
     
-    std::string method = client->request.substr(0, client->request.find(" "));
-
-    size_t host_start = client->request.find("Host: ") + strlen("Host: ");
-    size_t host_end = client->request.find("\r\n", host_start);
-    client->host = client->request.substr(host_start, host_end - host_start);
-
-    std::string content_len;
-
-    if (method == "POST") {
-        size_t content_len_start = client->request.find("Content-Length: ") + strlen("Content-Length: ");
-        size_t content_len_end = client->request.find("\r\n", content_len_start);
-        content_len = client->request.substr(content_len_start, content_len_end - content_len_start);
-        if (body.length() == std::stoi(content_len)) {
+    if (req.get_method() == "POST") {
+        assert(req.get_body().length() <= std::stoi(req.get_header("Content-Length")));
+        if (req.get_body().length() == std::stoi(req.get_header("Content-Length"))) {
             if (state) delete state;
             state = new parse_state(this);
             parent->resolve(state);
