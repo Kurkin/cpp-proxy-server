@@ -18,6 +18,7 @@
 #include <set>
 #include <thread>
 #include <chrono>
+#include "http_handler.hpp"
 
 #define BUFF_SIZE 1024
 #define USER_EVENT_IDENT 0x5c0276ef
@@ -40,6 +41,9 @@ private:
     server_socket* server;
     
     io_queue queue;
+    
+//    lru_cache<std::string, http> cache;
+//    lru_cache<std::string, http> permanent_moved;
     
 public:
     proxy_server(io_queue queue, int port);
@@ -119,15 +123,16 @@ public:
         }
     };
     
-    parse_state* get_next() {
+    parse_state* get_next()
+    {
         std::unique_lock<std::mutex> lk1(ans_mutex);
         parse_state* connection = ans.front();
         ans.pop_front();
         return connection;
     }
     
-    funct_t host_resolfed_f = [&](struct kevent event){
-
+    funct_t host_resolfed_f = [&](struct kevent event)
+    {
         parse_state* parse_ed = get_next();
         
         {
@@ -138,22 +143,20 @@ public:
             }
         }
         
-        parse_ed -> connection -> connect_to_server();
-        parse_ed -> connection -> make_request();
-        
-        tcp_connection* temp = parse_ed -> connection;
-        temp -> state = nullptr;
+        tcp_connection* connection = parse_ed -> connection;
+        connection -> state = nullptr;
         delete parse_ed;
         
-        queue.add_event_handler(temp -> get_server_sock(), EVFILT_READ, [temp](struct kevent event){
-            temp -> server_handler(event);
+        connection -> connect_to_server();
+        connection -> make_request();
+        
+        queue.add_event_handler(connection -> get_server_sock(), EVFILT_READ, [connection](struct kevent event){
+            connection -> server_handler(event);
         });
         
-        queue.add_event_handler(temp -> get_client_sock(), EVFILT_READ, [temp](struct kevent event){
-            temp -> client_handler(event);
-        });
-        
-        
+//        queue.add_event_handler(connection -> get_client_sock(), EVFILT_READ, [connection](struct kevent event){
+//            connection -> client_handler(event);
+//        });
         
         std::unique_lock<std::mutex> lk2(ans_mutex);
         if (ans.size() != 0) {
@@ -214,25 +217,26 @@ private:
             
             client_socket* socket;
             
-            int get_socket() { return socket->get_socket(); };
+            int get_socket() { return socket->get_socket(); }
             
             std::string request;
             std::string host;
             in_addr addr;
         };
         
-        struct tcp_server {
-            tcp_server(client_socket* socket) : socket(socket) {};
-            ~tcp_server() {
+        struct tcp_server
+        {
+            tcp_server(client_socket* socket) : socket(socket) {}
+            ~tcp_server()
+            {
                 std::cout << socket->get_socket() << " server deleted\n";
                 delete socket;
-            };
+            }
+            
+            int get_socket() { return socket->get_socket(); }
             
             client_socket* socket;
-            
-            int get_socket() {
-                return socket->get_socket();
-            }
+            in_addr addr;
         };
     };
 };

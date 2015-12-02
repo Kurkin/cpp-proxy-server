@@ -30,8 +30,11 @@ http::http(std::string text) : text(text)
         headers_end = crlf + 2;
     };
     
-    if (headers_end + 2 != text.end())
+    if (headers_end + 2 != text.end()) {
         body = std::make_pair(headers_end + 2, text.end());
+    } else {
+        body = std::make_pair(text.end(), text.end());
+    }
 }
 
 std::string const http::get_header(std::string name) {
