@@ -9,7 +9,6 @@
 #ifndef http_handler_hpp
 #define http_handler_hpp
 
-#include <stdio.h>
 #include <iostream>
 #include <map>
 

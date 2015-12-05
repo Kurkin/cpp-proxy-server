@@ -9,17 +9,8 @@
 #ifndef utils_hpp
 #define utils_hpp
 
-
-#include <netdb.h>
-#include <arpa/inet.h>
-#include <sys/socket.h>
-#include <sys/types.h>
-#include <stdio.h>
-#include <iostream>
 #include <unordered_map>
 #include <list>
-#include <fcntl.h>
-#include "throw_error.h"
 
 struct server_socket {
     server_socket(int port);

@@ -9,14 +9,9 @@
 #ifndef kqueue_hpp
 #define kqueue_hpp
 
-#include <iostream>
-#include <sys/socket.h>
-#include <sys/types.h>
 #include <sys/event.h>
 #include <map>
-#include <err.h>
 #include <vector>
-#include "throw_error.h"
 
 typedef std::function<void(struct kevent)> funct_t;
 

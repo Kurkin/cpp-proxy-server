@@ -1,6 +1,6 @@
 #include "throw_error.h"
 
-#include "errno.h"
+#include <sys/errno.h>
 #include <cstring>
 #include <sstream>
 #include <stdexcept>
@@ -11,18 +11,22 @@ namespace
     {
         switch (err)
         {
-        case EBADF:
-            return "EBADF";
-        case EAGAIN:
-            return "EAGAIN";
-        case EACCES:
-            return "EACCES";
-        case EINVAL:
-            return "EINVAL";
-        case EADDRINUSE:
-            return "EADDRINUSE";
-        case ECONNRESET:
-            return "ECONNRESET";
+            case EBADF:
+                return "EBADF";
+            case EAGAIN:
+                return "EAGAIN";
+            case EACCES:
+                return "EACCES";
+            case EINVAL:
+                return "EINVAL";
+            case EMFILE:
+                return "EMFILE";
+            case EADDRINUSE:
+                return "EADDRINUSE";
+            case ECONNRESET:
+                return "ECONNRESET";
+            case ECONNREFUSED:
+                return "ECONNREFUSED";
         }
 
         return "<unknown error>";

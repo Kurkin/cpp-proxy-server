@@ -6,8 +6,10 @@
 //  Copyright © 2015 Kurkin Dmitry. All rights reserved.
 //
 
-#include "proxy.hpp"
 #include <assert.h>
+
+#include "proxy.hpp"
+#include "throw_error.h"
 
 void proxy_server::resolve(parse_state* state) {
     if (permanent_moved.contain(state->connection->get_host() + state->connection->get_URI())) {
@@ -57,12 +59,11 @@ void proxy_server::tcp_connection::client_handler(struct kevent event) {
 void proxy_server::tcp_connection::read_request_f(struct kevent event)
 {
     char buff[BUFF_SIZE];
-
+    
     std::cout << "read request of " << event.ident << "\n";
     size_t size = read(get_client_sock(), buff, BUFF_SIZE);
     if (size == -1) {
-        perror("read error");
-        return;
+        throw_error(errno, "read()");
     }
 
     add_request_text(std::string(buff, size));

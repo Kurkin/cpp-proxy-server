@@ -6,7 +6,14 @@
 //  Copyright © 2015 Kurkin Dmitry. All rights reserved.
 //
 
+#include <fcntl.h>
+#include <sys/socket.h>
+#include <arpa/inet.h>
+#include <iostream>
+#include <netdb.h>
+
 #include "utils.hpp"
+#include "throw_error.h"
 
 client_socket::client_socket(server_socket* server)
 {

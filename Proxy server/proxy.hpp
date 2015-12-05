@@ -9,14 +9,13 @@
 #ifndef proxy_hpp
 #define proxy_hpp
 
-#include <stdio.h>
-#include <list>
 #include <mutex>
 #include <condition_variable>
+#include <netdb.h>
+#include <err.h>
+
 #include "kqueue.hpp"
 #include "utils.hpp"
-#include <set>
-#include <thread>
 #include "http_handler.hpp"
 
 #define BUFF_SIZE 1024

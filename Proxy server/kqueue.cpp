@@ -6,7 +6,11 @@
 //  Copyright © 2015 Kurkin Dmitry. All rights reserved.
 //
 
+#include <sys/socket.h>
+#include <sys/errno.h>
+
 #include "kqueue.hpp"
+#include "throw_error.h"
 
 std::map<std::pair<uintptr_t, int16_t>, funct_t> events_handlers;
 
