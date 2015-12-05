@@ -78,11 +78,10 @@ void io_queue::watch_loop() {
             continue;
         }
         
-        std::cout << "in cycle\n";
-
         for (size_t i = 0; i < new_events && !finished; i++) {
             if (evList[i].ident != -1) {
                 std::pair<uintptr_t, int16_t> event(evList[i].ident, evList[i].filter);
+                std::cout << event.first << " " << event.second << " event\n";
                 if (events_handlers.find(event) != events_handlers.end()) {
                     funct_t funct = events_handlers.at(event);
                     funct(evList[i]);

@@ -14,7 +14,6 @@
 #include <arpa/inet.h>
 #include <sys/socket.h>
 #include <sys/types.h>
-#include <sys/event.h>
 #include <stdio.h>
 #include <iostream>
 #include <unordered_map>

@@ -24,24 +24,25 @@ http::http(std::string text) : text(text)
     while (headers_end != text.end() && *headers_end != '\r')
     {
         auto space = std::find_if(headers_end, text.end(), [](char a) { return a == ':'; });
-        auto crlf = std::find_if(space + 1, text.end(), [](char a){ return a == '\r'; }); // todo: rename
+        auto crlf = std::find_if(space + 1, text.end(), [](char a){ return a == '\r'; });
         
-        headers.insert(std::make_pair(std::string(headers_end, space), std::make_pair(space + 2, crlf)));
+        headers.insert({{headers_end, space}, {space + 2, crlf}});
         headers_end = crlf + 2;
     };
     
     if (headers_end + 2 != text.end()) {
-        body = std::make_pair(headers_end + 2, text.end());
+        body = {headers_end + 2, text.end()};
     } else {
-        body = std::make_pair(text.end(), text.end());
+        body = {text.end(), text.end()};
     }
 }
 
-std::string const http::get_header(std::string name) {
+std::string http::get_header(std::string name) const
+{
     if (headers.find(name) != headers.end()) {
         auto value = headers.at(name);
-        std::cout << "get " << name << " ans is " << std::string(value.first, value.second) << "\n";
-        return {value.first, value.second};
+        std::cout << "get " << name << " ans is " << value << "\n";
+        return value;
     }
     return "";
 }
@@ -50,20 +51,33 @@ request::request(std::string text) : http(text)
 {
     auto first_space = std::find_if(text.begin(), text.end(), [](char a) { return a == ' '; });
     auto second_space = std::find_if(first_space + 1, text.end(), [](char a) { return a == ' '; });
-    auto r_n = std::find_if(second_space + 1, text.end(), [](char a) { return a == '\r'; });
+    auto crlf = std::find_if(second_space + 1, text.end(), [](char a) { return a == '\r'; });
     
-    method = std::make_pair(text.begin(), first_space);
-    URI = std::make_pair(first_space + 1, second_space);
-    http_version = std::make_pair(second_space + 1, r_n);
+    method = {text.begin(), first_space};
+    URI = {first_space + 1, second_space};
+    http_version = {second_space + 1, crlf};
 }
 
 response::response(std::string text) : http(text)
 {
     auto first_space = std::find_if(text.begin(), text.end(), [](char a) { return a == ' '; });
     auto second_space = std::find_if(first_space + 1, text.end(), [](char a) { return a == ' '; });
-    auto r_n = std::find_if(second_space + 1, text.end(), [](char a) { return a == '\r'; });
+    auto crlf = std::find_if(second_space + 1, text.end(), [](char a) { return a == '\r'; });
     
-    http_version = std::make_pair(text.begin(), first_space);
-    code = std::make_pair(first_space + 1, second_space);
-    code_transcript = std::make_pair(second_space + 1, r_n);
+    http_version = {text.begin(), first_space};
+    code  = {first_space + 1, second_space};
+    code_transcript = {second_space + 1, crlf};
+}
+
+std::string response::make_redirect_response() const
+{
+    return http_version + " " + code + " " + code_transcript +
+    "\r\nContent-length: 0\r\nLocation: " + get_header("Location") + "\r\n\r\n";
+}
+
+std::string response::make_cache_response() const
+{
+    return http_version + " " + code + " " + code_transcript +
+    "\r\nContent-Length:" + get_header("Content-Length") +
+    "\r\nETag: " + get_header("ETag") + "\r\n\r\n" + get_body();
 }

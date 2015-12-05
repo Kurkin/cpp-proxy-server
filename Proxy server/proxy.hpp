@@ -42,8 +42,8 @@ private:
     
     io_queue queue;
     
-//    lru_cache<std::string, http> cache;
-//    lru_cache<std::string, http> permanent_moved;
+    lru_cache<std::string, response> cache;
+    lru_cache<std::string, std::string> permanent_moved;
     
 public:
     proxy_server(io_queue queue, int port);
@@ -126,9 +126,9 @@ public:
     parse_state* get_next()
     {
         std::unique_lock<std::mutex> lk1(ans_mutex);
-        parse_state* connection = ans.front();
+        parse_state* state = ans.front();
         ans.pop_front();
-        return connection;
+        return state;
     }
     
     funct_t host_resolfed_f = [&](struct kevent event)
@@ -150,14 +150,6 @@ public:
         connection -> connect_to_server();
         connection -> make_request();
         
-        queue.add_event_handler(connection -> get_server_sock(), EVFILT_READ, [connection](struct kevent event){
-            connection -> server_handler(event);
-        });
-        
-//        queue.add_event_handler(connection -> get_client_sock(), EVFILT_READ, [connection](struct kevent event){
-//            connection -> client_handler(event);
-//        });
-        
         std::unique_lock<std::mutex> lk2(ans_mutex);
         if (ans.size() != 0) {
             queue.trigger_user_event_handler(USER_EVENT_IDENT);
@@ -174,14 +166,15 @@ public:
     
 private:
     
-    struct parse_state {
+    struct parse_state
+    {
         parse_state(tcp_connection* connection) : connection(connection) {};
         tcp_connection* connection;
         bool canceled = false;
     };
     
-    struct tcp_connection {
-        
+    struct tcp_connection
+    {
     private:
         struct tcp_client;
         struct tcp_server;
@@ -191,26 +184,28 @@ private:
         
     public:
         tcp_connection(client_socket* client, proxy_server* parent) : client(new tcp_client(client)), parent(parent) {};
-        ~tcp_connection() { std::cout << "tcp_connect deleted\n"; };
-        int get_client_sock() { return client->get_socket(); };
-        int get_server_sock() { return server->get_socket(); };
+        ~tcp_connection() { std::cout << "tcp_connect deleted\n"; }
+        int get_client_sock() { return client->get_socket(); }
+        int get_server_sock() { return server->get_socket(); }
         std::string get_host() { return client->host; }
-        void set_addr(in_addr addr) { client->addr = addr; };
+        std::string get_URI() { return client->URI; }
+        void set_addr(in_addr addr) { client->addr = addr; }
         void connect_to_server();
         void make_request();
+        void try_to_cache(tcp_server* server);
         void server_handler(struct kevent event);
         void client_handler(struct kevent event);
         
         parse_state* state = nullptr;
         
     private:
-        
         void add_request_text(std::string text);
         void read_request_f(struct kevent event);
 
         struct tcp_client {
             tcp_client(client_socket* client) : socket(client) {};
-            ~tcp_client() {
+            ~tcp_client()
+            {
                 std::cout << socket->get_socket() << " client deleted\n";
                 delete socket;
             };
@@ -221,6 +216,7 @@ private:
             
             std::string request;
             std::string host;
+            std::string URI;
             in_addr addr;
         };
         
@@ -237,6 +233,10 @@ private:
             
             client_socket* socket;
             in_addr addr;
+            std::string response;
+            std::string request;
+            std::string host;
+            std::string URI;
         };
     };
 };

@@ -15,39 +15,41 @@
 
 struct http
 {
-    typedef std::pair<std::string::iterator, std::string::iterator> substr;
+//    typedef std::pair<std::string::iterator, std::string::iterator> substr; its dont work
     
     http(std::string text);
     
-    std::string const get_header(std::string name);
-    std::string const get_body() { return {body.first, body.second}; };  // bad alloc
-    
+    std::string get_header(std::string name) const;
+    std::string get_body() const { return body; }
 private:
     std::string text;
-    std::map<std::string, substr> headers;
-    substr body;
+    std::map<std::string, std::string> headers;
+    std::string body;
 };
 
 struct request : public http
 {
     request(std::string);
 
-    std::string const get_method() { return {method.first, method.second}; };
-    
+    std::string get_method() const { return method; }
+    std::string get_URI() const { return URI; }
 private:
-    substr method;
-    substr URI;
-    substr http_version;
+    std::string method;
+    std::string URI;
+    std::string http_version;
 };
 
 struct response : public http
 {
     response(std::string);
     
+    std::string get_code() const { return code; }
+    std::string make_redirect_response() const;
+    std::string make_cache_response() const;
 private:
-    substr http_version;
-    substr code;
-    substr code_transcript;
+    std::string http_version;
+    std::string code;
+    std::string code_transcript;
 };
 
 #endif /* http_handler_hpp */
