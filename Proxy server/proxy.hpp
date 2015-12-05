@@ -17,7 +17,6 @@
 #include "utils.hpp"
 #include <set>
 #include <thread>
-#include <chrono>
 #include "http_handler.hpp"
 
 #define BUFF_SIZE 1024
@@ -53,7 +52,7 @@ public:
     
     std::function<void()> resolver = [&](){
         
-        lru_cache<std::string, in_addr> cache(1000);
+        lru_cache<std::string, addrinfo> cache(1000);
         while (true) {
             std::unique_lock<std::mutex> lk(queue_mutex);
             queue_cond.wait(lk, [&]{return queue_ready;});
@@ -76,15 +75,11 @@ public:
                 }
             }
 
-            if (name.find(":") != std::string::npos) {
-                name.erase(name.find(":"));
-            }
-            
             if (cache.contain(name)) {
                 std::unique_lock<std::mutex> lk1(ans_mutex);
                 std::unique_lock<std::mutex> lk2(state);
                 if (!parse_ed->canceled) {
-                    parse_ed->connection->set_addr(cache.get(name));
+                    parse_ed->connection->set_addrinfo(cache.get(name));
                 } else {
                     delete parse_ed;
                     continue;
@@ -96,20 +91,22 @@ public:
                 continue;
             }
             
-            struct hostent* addr;
             
-            if ((addr = gethostbyname(name.c_str())) == NULL) {
-                perror("resolve fail");
-                std::cout << name << "\n";
-                continue; //resolve error, just skip this host
+            struct addrinfo hints, *res;
+            
+            memset(&hints, 0, sizeof(hints));
+            hints.ai_family = PF_INET;
+            hints.ai_socktype = SOCK_STREAM;
+            int error = getaddrinfo(name.c_str(), "http", &hints, &res);
+            if (error) {
+                errx(1, "%s", gai_strerror(error));
             }
-            
             
             std::unique_lock<std::mutex> lk1(ans_mutex);
             std::unique_lock<std::mutex> lk2(state);
                 if (!parse_ed->canceled) {
-                    parse_ed->connection->set_addr(*(in_addr*)addr->h_addr_list[0]);
-                    cache.put(name, *(in_addr*)addr->h_addr_list[0]);
+                    parse_ed->connection->set_addrinfo(*res);
+                    cache.put(name, *res);
                 } else {
                     delete parse_ed;
                     continue;
@@ -189,7 +186,7 @@ private:
         int get_server_sock() { return server->get_socket(); }
         std::string get_host() { return client->host; }
         std::string get_URI() { return client->URI; }
-        void set_addr(in_addr addr) { client->addr = addr; }
+        void set_addrinfo(struct addrinfo addrinfo) { client->addrinfo = addrinfo; }
         void connect_to_server();
         void make_request();
         void try_to_cache(tcp_server* server);
@@ -217,7 +214,7 @@ private:
             std::string request;
             std::string host;
             std::string URI;
-            in_addr addr;
+            struct addrinfo addrinfo;
         };
         
         struct tcp_server
@@ -232,7 +229,7 @@ private:
             int get_socket() { return socket->get_socket(); }
             
             client_socket* socket;
-            in_addr addr;
+            struct addrinfo addrinfo;
             std::string response;
             std::string request;
             std::string host;

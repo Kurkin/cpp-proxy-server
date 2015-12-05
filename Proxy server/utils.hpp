@@ -25,7 +25,7 @@ struct server_socket {
     server_socket(int port);
     ~server_socket() { close(socket); };
     
-    int get_socket() { return socket; };
+    int get_socket() const { return socket; };
     void bind_and_listen();
     
 private:
@@ -35,11 +35,11 @@ private:
 
 struct client_socket {
     
-    client_socket(in_addr address); // for connect;
+    client_socket(struct addrinfo addrinfo); // for connect;
     client_socket(server_socket* server); // for accept
     ~client_socket() { close(socket); };
     
-    int get_socket() { return socket; };
+    int get_socket() const { return socket; };
     
 private:
     int socket;
@@ -80,7 +80,7 @@ struct lru_cache {
         }
     }
     
-    bool contain(const key_t& key) { return items_map.find(key) != items_map.end(); };
+    bool contain(const key_t& key) const { return items_map.find(key) != items_map.end(); };
     size_t size() const { return items_map.size(); };
     
 private:

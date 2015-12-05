@@ -23,9 +23,9 @@ client_socket::client_socket(server_socket* server)
     };
 }
 
-client_socket::client_socket(in_addr address)
+client_socket::client_socket(addrinfo address)
 {
-    socket = ::socket(AF_INET, SOCK_STREAM, 0);
+    socket = ::socket(address.ai_family, address.ai_socktype, address.ai_protocol);
     if (socket == -1) {
         throw_error(errno, "socket()");
     }
@@ -42,12 +42,8 @@ client_socket::client_socket(in_addr address)
         throw_error(errno, "fcntl()");
     }
     
-    sockaddr_in server;
-    server.sin_family = AF_INET;
-    server.sin_addr.s_addr = inet_addr(inet_ntoa(address));
-    server.sin_port = htons(80);
-    std::cout << "trying connect to " << inet_ntoa(address) << "\n";
-    if (connect(socket,  (sockaddr *)&server, sizeof(server)) < 0) {
+    std::cout << "trying connect to " << inet_ntoa(*(in_addr*) address.ai_addr) << "\n"; // incorrect
+    if (connect(socket,  address.ai_addr, address.ai_addrlen) < 0) {
         if (errno != EINPROGRESS) {
             throw_error(errno, "connect()");
         }

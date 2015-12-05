@@ -44,8 +44,10 @@ void proxy_server::tcp_connection::client_handler(struct kevent event) {
         lk.unlock();
         parent->queue.delete_event_handler(get_client_sock(), EVFILT_READ);
         delete client;
-        if (server) parent->queue.delete_event_handler(get_server_sock(), EVFILT_READ);
-        if (server) delete server;
+        if (server) {
+            parent->queue.delete_event_handler(get_server_sock(), EVFILT_READ);
+            delete server;
+        }
         delete this;
     } else {
         read_request_f(event);
@@ -92,7 +94,7 @@ void proxy_server::tcp_connection::add_request_text(std::string text)
     }
     else if (req.get_header("Transfer-Encoding") == "chunked")
         {
-            if (std::string(client->request.end() - 5, client->request.end()) == "0\r\n\r\n") {
+            if (std::string(client->request.end() - 7, client->request.end()) == "\r\n0\r\n\r\n") {
                 if (state) delete state;
                 state = new parse_state(this);
                 parent->resolve(state);
@@ -109,10 +111,12 @@ void proxy_server::tcp_connection::add_request_text(std::string text)
 void proxy_server::tcp_connection::connect_to_server()
 {
     if (server) {
-        if (inet_ntoa(client->addr) == inet_ntoa(server->addr)) {
+        if (client->host == server->host)
+        {
             std::cout << "keep-alive is working!\n";
             try_to_cache(server);
             server->response = "";
+            server->URI = client->URI;
             return;
         } else {
             std::cout << "delete old server" << get_server_sock() << "\n";
@@ -122,7 +126,9 @@ void proxy_server::tcp_connection::connect_to_server()
             server = nullptr;
         }
     }
-    server = new tcp_server(new client_socket(client->addr));
+    server = new tcp_server(new client_socket(client->addrinfo));
+    server->host = client->host;
+    server->URI = client->URI;
 }
 
 void proxy_server::tcp_connection::make_request()
