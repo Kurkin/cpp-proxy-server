@@ -15,6 +15,7 @@
 #include <sys/event.h>
 #include <map>
 #include <err.h>
+#include <vector>
 #include "throw_error.h"
 
 typedef std::function<void(struct kevent)> funct_t;
@@ -34,7 +35,7 @@ struct io_queue {
     
 private:
     int ident;
-    bool ident_is_valid = true;
+    std::vector<uintptr_t> deleted_idents;
     bool finished = false;
 };
 
