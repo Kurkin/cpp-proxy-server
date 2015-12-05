@@ -12,8 +12,6 @@
 #include "kqueue.hpp"
 #include "throw_error.h"
 
-std::map<std::pair<uintptr_t, int16_t>, funct_t> events_handlers;
-
 io_queue::io_queue()
 {
     ident = kqueue();

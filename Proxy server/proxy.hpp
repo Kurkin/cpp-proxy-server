@@ -9,6 +9,7 @@
 #ifndef proxy_hpp
 #define proxy_hpp
 
+#include <list>
 #include <mutex>
 #include <condition_variable>
 #include <netdb.h>
@@ -38,13 +39,13 @@ private:
     
     server_socket* server;
     
-    io_queue queue;
+    io_queue& queue;
     
     lru_cache<std::string, response> cache;
     lru_cache<std::string, std::string> permanent_moved;
     
 public:
-    proxy_server(io_queue queue, int port);
+    proxy_server(io_queue& queue, int port);
     ~proxy_server();
     
     void resolve(parse_state* connection);

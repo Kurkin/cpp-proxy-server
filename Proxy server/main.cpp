@@ -6,13 +6,17 @@
 //
 
 #include <thread>
+#include <signal.h>
 
 #include "kqueue.hpp"
 #include "proxy.hpp"
 
+io_queue queue;
+
 int main(int argc, const char * argv[])
 {  
-    io_queue queue;
+
+    signal(SIGTERM, [](int sig){ queue.hard_stop(); });
     
     proxy_server proxy(queue, 2540);
     

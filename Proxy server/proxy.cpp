@@ -24,7 +24,7 @@ void proxy_server::resolve(parse_state* state) {
     queue_cond.notify_one();
 }
 
-proxy_server::proxy_server(io_queue queue, int port): queue(queue), permanent_moved(10000), cache(10000) {
+proxy_server::proxy_server(io_queue& queue, int port): queue(queue), permanent_moved(10000), cache(10000) {
     server = new server_socket(port);
     server->bind_and_listen();
     

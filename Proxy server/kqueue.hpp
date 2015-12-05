@@ -29,6 +29,7 @@ struct io_queue {
     void soft_stop(); //sigterm
     
 private:
+    std::map<std::pair<uintptr_t, int16_t>, funct_t> events_handlers;
     int ident;
     std::vector<uintptr_t> deleted_idents;
     bool finished = false;
