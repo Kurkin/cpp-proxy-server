@@ -30,9 +30,9 @@ client_socket::client_socket(server_socket* server)
     };
 }
 
-client_socket::client_socket(addrinfo address)
+client_socket::client_socket(struct addrinfo addrinfo)
 {
-    socket = ::socket(address.ai_family, address.ai_socktype, address.ai_protocol);
+    socket = ::socket(addrinfo.ai_family, addrinfo.ai_socktype, addrinfo.ai_protocol);
     if (socket == -1) {
         throw_error(errno, "socket()");
     }
@@ -49,8 +49,8 @@ client_socket::client_socket(addrinfo address)
         throw_error(errno, "fcntl()");
     }
     
-    std::cout << "trying connect to " << inet_ntoa(*(in_addr*) address.ai_addr) << "\n"; // incorrect
-    if (connect(socket,  address.ai_addr, address.ai_addrlen) < 0) {
+    std::cout << "trying connect to " << inet_ntoa(((sockaddr_in *) addrinfo.ai_addr)->sin_addr) << "\n";
+    if (connect(socket,  addrinfo.ai_addr, addrinfo.ai_addrlen) < 0) {
         if (errno != EINPROGRESS) {
             throw_error(errno, "connect()");
         }

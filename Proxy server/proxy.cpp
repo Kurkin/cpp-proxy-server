@@ -112,6 +112,7 @@ void proxy_server::tcp_connection::add_request_text(std::string text)
 void proxy_server::tcp_connection::connect_to_server()
 {
     if (server) {
+//        std::cout << server->response;
         if (client->host == server->host)
         {
             std::cout << "keep-alive is working!\n";
@@ -127,6 +128,7 @@ void proxy_server::tcp_connection::connect_to_server()
             server = nullptr;
         }
     }
+    
     server = new tcp_server(new client_socket(client->addrinfo));
     server->host = client->host;
     server->URI = client->URI;
@@ -145,7 +147,8 @@ void proxy_server::tcp_connection::make_request()
 //    }
     
     parent->queue.add_event_handler(get_server_sock(), EVFILT_WRITE, [this](struct kevent event){
-        write(get_server_sock(), client->request.c_str(), client->request.length());
+        struct request request(client->request);
+        write(get_server_sock(), request.make_request().c_str(), request.make_request().size());
         server->request = client->request;
         client->request = "";
         parent->queue.delete_event_handler(get_server_sock(), EVFILT_WRITE);
@@ -161,6 +164,7 @@ void proxy_server::tcp_connection::server_handler(struct kevent event)
     if (event.flags & EV_EOF && event.data == 0) {
         std::cout << "EV_EOF from " << event.ident << " server\n";
         try_to_cache(server);
+//        std::cout << server->response;
         parent->queue.delete_event_handler(get_server_sock(), EVFILT_READ);
         delete server;
         server = nullptr;
@@ -183,7 +187,12 @@ void proxy_server::tcp_connection::try_to_cache(proxy_server::tcp_connection::tc
     
     auto response = std::make_shared<struct response>(server->response);
     
-    if (std::stoi(response->get_code()) == 301) {
+    if (std::stoi(response->get_code()) == 301 && ((response->get_header("Content-Length") != ""
+                                                    && response->get_body().length() == std::stoi(response->get_header("Content-Length")))
+                                                   || (response->get_header("Transfer-Encoding") == "chunked"
+                                                       && std::string(server->response.end() - 7, server->response.end()) == "\r\n0\r\n\r\n"))) {
+        std::cout << server->request;
+        std::cout << server->response;
         parent->permanent_moved.put(get_host() + get_URI(), response->make_redirect_response());
     }
     

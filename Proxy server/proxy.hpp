@@ -97,9 +97,18 @@ public:
             memset(&hints, 0, sizeof(hints));
             hints.ai_family = PF_INET;
             hints.ai_socktype = SOCK_STREAM;
-            int error = getaddrinfo(name.c_str(), "http", &hints, &res);
+            hints.ai_flags = hints.ai_flags | AI_NUMERICSERV;
+            std::string port = "80";
+            if (name.find(":") != -1) {
+                size_t port_str = name.find(":");
+                port = name.substr(port_str + 1);
+                name = name.erase(port_str);
+            }
+            std::cout << name << " " << port << "\n";
+            int error = getaddrinfo(name.c_str(), port.c_str(), &hints, &res);
             if (error) {
-                errx(1, "%s", gai_strerror(error));
+                perror(gai_strerror(error));
+                continue;
             }
             
             std::unique_lock<std::mutex> lk1(ans_mutex);
@@ -124,7 +133,7 @@ public:
     {
         std::unique_lock<std::mutex> lk1(ans_mutex);
         parse_state* state = ans.front();
-        ans.pop_front();
+        ans.pop_front();    // bad free sometimes
         return state;
     }
     

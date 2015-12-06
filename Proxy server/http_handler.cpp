@@ -56,6 +56,16 @@ request::request(std::string text) : http(text)
     method = {text.begin(), first_space};
     URI = {first_space + 1, second_space};
     http_version = {second_space + 1, crlf};
+    other = {crlf + 2, text.end()};
+}
+
+std::string request::make_request() const {
+    std::string host = get_header("Host");
+    if (URI.find(host) != -1) {
+        return method + " " + URI.substr(URI.find(host) + host.size()) + " " + http_version + "\r\n" + other;
+    } else {
+        return method + " " + URI + " " + http_version + "\r\n" + other;
+    }
 }
 
 response::response(std::string text) : http(text)
