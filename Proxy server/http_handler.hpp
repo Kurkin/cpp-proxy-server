@@ -20,6 +20,7 @@ struct http
     
     std::string get_header(std::string name) const;
     std::string get_body() const { return body; }
+    std::string get_text() const { return text; }
 private:
     std::string text;
     std::map<std::string, std::string> headers;

@@ -41,7 +41,6 @@ std::string http::get_header(std::string name) const
 {
     if (headers.find(name) != headers.end()) {
         auto value = headers.at(name);
-        std::cout << "get " << name << " ans is " << value << "\n";
         return value;
     }
     return "";

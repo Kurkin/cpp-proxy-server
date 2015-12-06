@@ -80,7 +80,7 @@ void proxy_server::tcp_connection::add_request_text(std::string text)
     }
     
     request req(client->request);
-
+   
     client->host = req.get_header("Host");
     client->URI = req.get_URI();
     
@@ -112,7 +112,6 @@ void proxy_server::tcp_connection::add_request_text(std::string text)
 void proxy_server::tcp_connection::connect_to_server()
 {
     if (server) {
-//        std::cout << server->response;
         if (client->host == server->host)
         {
             std::cout << "keep-alive is working!\n";
@@ -137,14 +136,17 @@ void proxy_server::tcp_connection::connect_to_server()
 void proxy_server::tcp_connection::make_request()
 {
     
-//    if (parent->cache.contain(get_host() + get_URI())) {
-//        struct response response = parent->cache.get(get_host() + get_URI());
-//        auto cache_response = response.make_cache_response();
-//        std::cout << "ans from cache to: " << get_host() + get_URI() << "\n";
-//        std::cout << client->request;
-//        write(get_client_sock(), cache_response.c_str(), cache_response.size());
-//        return;
-//    }
+    if (parent->cache.contain(client->URI)) {
+        struct response response = parent->cache.get(client->URI);
+        auto cache_response = response.make_cache_response();
+        std::cout << "cache is working\n";
+//        write(get_client_sock(), response.get_text().c_str(), response.get_text().size());
+        write(get_client_sock(), cache_response.c_str(), cache_response.size());
+        client->request = "";
+        return;
+    }
+    
+    std::cout << "tcp_pair: client: " << get_client_sock() << " server: " << get_server_sock() << "\n";
     
     parent->queue.add_event_handler(get_server_sock(), EVFILT_WRITE, [this](struct kevent event){
         struct request request(client->request);
@@ -164,13 +166,11 @@ void proxy_server::tcp_connection::server_handler(struct kevent event)
     if (event.flags & EV_EOF && event.data == 0) {
         std::cout << "EV_EOF from " << event.ident << " server\n";
         try_to_cache(server);
-//        std::cout << server->response;
         parent->queue.delete_event_handler(get_server_sock(), EVFILT_READ);
         delete server;
         server = nullptr;
     } else {
         char buff[event.data];
-        std::cout << "transfer from " << get_server_sock() << " to " << get_client_sock() << "\n";
         size_t size = read(get_server_sock(), buff, event.data);
         server->response.append({buff, size});
         write(get_client_sock(), buff, size);
@@ -185,24 +185,29 @@ void proxy_server::tcp_connection::try_to_cache(proxy_server::tcp_connection::tc
         return;
     }
     
-    auto response = std::make_shared<struct response>(server->response);
+    struct response response(server->response);
     
-    if (std::stoi(response->get_code()) == 301 && ((response->get_header("Content-Length") != ""
-                                                    && response->get_body().length() == std::stoi(response->get_header("Content-Length")))
-                                                   || (response->get_header("Transfer-Encoding") == "chunked"
-                                                       && std::string(server->response.end() - 7, server->response.end()) == "\r\n0\r\n\r\n"))) {
-        std::cout << server->request;
-        std::cout << server->response;
-        parent->permanent_moved.put(get_host() + get_URI(), response->make_redirect_response());
-    }
-    
-    if (response->get_header("ETag") != "" && ((response->get_header("Content-Length") != ""
-        && response->get_body().length() == std::stoi(response->get_header("Content-Length")))
-        || (response->get_header("Transfer-Encoding") == "chunked"
-        && std::string(server->response.end() - 7, server->response.end()) == "\r\n0\r\n\r\n"))
-        && response->get_header("Vary") == "" && response->get_code() == "200")
+    if (response.get_code() == "301" && ((response.get_header("Content-Length") != ""
+        && response.get_body().length() == std::stoi(response.get_header("Content-Length")))
+        || (response.get_header("Transfer-Encoding") == "chunked"
+        && std::string(server->response.end() - 7, server->response.end()) == "\r\n0\r\n\r\n")))
     {
-        std::cout << "add to cachce: " << server->host + server->URI << "\n";
-        parent->cache.put(server->host + server->URI, *response);
+        parent->permanent_moved.put(server->URI, response.make_redirect_response());
     }
+    
+    if (response.get_header("ETag") != "" && response.get_header("Content-Length") != ""
+        && response.get_body().length() == std::stoi(response.get_header("Content-Length"))
+        && response.get_header("Vary") == "" && response.get_code() == "200"
+        && response.get_header("If-Match") == ""
+        && response.get_header("If-Modified-Since") == ""
+        && response.get_header("If-None-Match") == ""
+        && response.get_header("If-Range") == ""
+        && response.get_header("If-Unmodified-Since") == "")
+    {
+        std::cout << "add to cachce: " << server->URI  <<  " " << response.get_header("ETag") << "\n";
+        parent->cache.put(server->URI, response);
+    }
+    
+//        || (response.get_header("Transfer-Encoding") == "chunked"
+//            && std::string(server->response.end() - 7, server->response.end()) == "\r\n0\r\n\r\n"))
 }

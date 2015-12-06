@@ -18,6 +18,8 @@ typedef std::function<void(struct kevent)> funct_t;
 struct io_queue {
     
     io_queue();
+    io_queue(io_queue const&) = delete;
+    ~io_queue() { close(ident); }
     
     void add_event_handler(uintptr_t ident, int16_t filter, funct_t funct);
     void add_event_handler(uintptr_t ident, int16_t filter, uint16_t flags, funct_t funct);

@@ -49,14 +49,12 @@ client_socket::client_socket(struct addrinfo addrinfo)
         throw_error(errno, "fcntl()");
     }
     
-    std::cout << "trying connect to " << inet_ntoa(((sockaddr_in *) addrinfo.ai_addr)->sin_addr) << "\n";
+    std::cout << "connecting to " << inet_ntoa(((sockaddr_in *) addrinfo.ai_addr)->sin_addr) << " on sock " << socket << "\n";
     if (connect(socket,  addrinfo.ai_addr, addrinfo.ai_addrlen) < 0) {
         if (errno != EINPROGRESS) {
             throw_error(errno, "connect()");
         }
     }
-    
-    std::cout << "connected " << socket << " \n";
 }
 
 server_socket::server_socket(int port): port(port) {

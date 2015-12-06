@@ -104,7 +104,7 @@ public:
                 port = name.substr(port_str + 1);
                 name = name.erase(port_str);
             }
-            std::cout << name << " " << port << "\n";
+            
             int error = getaddrinfo(name.c_str(), port.c_str(), &hints, &res);
             if (error) {
                 perror(gai_strerror(error));
