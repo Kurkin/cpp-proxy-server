@@ -20,16 +20,16 @@ http::http(std::string text) : text(text)
         return a == '\n';
     })++;
     auto headers_end = headers_start + 1;
-    
+
     while (headers_end != text.end() && *headers_end != '\r')
     {
         auto space = std::find_if(headers_end, text.end(), [](char a) { return a == ':'; });
         auto crlf = std::find_if(space + 1, text.end(), [](char a){ return a == '\r'; });
-        
+
         headers.insert({{headers_end, space}, {space + 2, crlf}});
         headers_end = crlf + 2;
     };
-    
+
     if (headers_end + 2 != text.end()) {
         body = {headers_end + 2, text.end()};
     } else {
@@ -51,7 +51,7 @@ request::request(std::string text) : http(text)
     auto first_space = std::find_if(text.begin(), text.end(), [](char a) { return a == ' '; });
     auto second_space = std::find_if(first_space + 1, text.end(), [](char a) { return a == ' '; });
     auto crlf = std::find_if(second_space + 1, text.end(), [](char a) { return a == '\r'; });
-    
+
     method = {text.begin(), first_space};
     URI = {first_space + 1, second_space};
     http_version = {second_space + 1, crlf};
@@ -72,7 +72,7 @@ response::response(std::string text) : http(text)
     auto first_space = std::find_if(text.begin(), text.end(), [](char a) { return a == ' '; });
     auto second_space = std::find_if(first_space + 1, text.end(), [](char a) { return a == ' '; });
     auto crlf = std::find_if(second_space + 1, text.end(), [](char a) { return a == '\r'; });
-    
+
     http_version = {text.begin(), first_space};
     code  = {first_space + 1, second_space};
     code_transcript = {second_space + 1, crlf};

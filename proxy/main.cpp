@@ -7,6 +7,7 @@
 
 #include <thread>
 #include <signal.h>
+#include <iostream>
 
 #include "kqueue.hpp"
 #include "proxy.hpp"
@@ -22,8 +23,12 @@ int main(int argc, const char * argv[])
     
     std::thread dns_resolver1(proxy.resolver);
     std::thread dns_resolver2(proxy.resolver);
-    
-    queue.watch_loop();
-    
+
+    try {
+        queue.watch_loop();
+    } catch (std::runtime_error error){
+        std::cout << error.what() << "\n";
+    }
+
     return 0;
 }

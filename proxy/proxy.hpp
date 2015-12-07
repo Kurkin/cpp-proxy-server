@@ -25,7 +25,7 @@
 #define USER_EVENT_IDENT 0x5c0276ef
 
 struct proxy_server {
-    
+
 private:
     struct tcp_connection;
     struct parse_state;
@@ -33,39 +33,39 @@ private:
     std::mutex queue_mutex;
     std::condition_variable queue_cond;
     bool queue_ready;
-    
+
     std::mutex ans_mutex;
     std::list<parse_state*> ans;
-    
+
     std::mutex state;
-    
+
     server_socket* server;
-    
+
     io_queue& queue;
-    
+
     lru_cache<std::string, response> cache;
     lru_cache<std::string, std::string> permanent_moved;
-    
+
 public:
     proxy_server(io_queue& queue, int port);
     ~proxy_server();
-    
+
     void resolve(parse_state* connection);
-    
+
     std::function<void()> resolver = [&](){
-        
+
         lru_cache<std::string, addrinfo> cache(1000);
         while (true) {
             std::unique_lock<std::mutex> lk(queue_mutex);
             queue_cond.wait(lk, [&]{return queue_ready;});
-            
+
             parse_state* parse_ed = host_names.front();
             host_names.pop_front();
             if (host_names.size() == 0) {
                 queue_ready = false;
             }
             lk.unlock();
-            
+
             std::string name;
             {
                 std::unique_lock<std::mutex> lk1(state);
@@ -92,10 +92,10 @@ public:
                 lk1.unlock();
                 continue;
             }
-            
-            
+
+
             struct addrinfo hints, *res;
-            
+
             memset(&hints, 0, sizeof(hints));
             hints.ai_family = AF_INET;
             hints.ai_socktype = SOCK_STREAM;
@@ -106,14 +106,14 @@ public:
                 port = name.substr(port_str + 1);
                 name = name.erase(port_str);
             }
-            
+
             int error = getaddrinfo(name.c_str(), port.c_str(), &hints, &res);
             if (error) {
-                perror(name.c_str());
+                std::cout << name << "\n";
                 perror(gai_strerror(error));
                 continue;
             }
-            
+
             std::unique_lock<std::mutex> lk1(ans_mutex);
             std::unique_lock<std::mutex> lk2(state);
                 if (!parse_ed->canceled) {
@@ -127,11 +127,11 @@ public:
                 queue.trigger_user_event_handler(USER_EVENT_IDENT);
             lk2.unlock();
             lk1.unlock();
-            
+
             queue_cond.notify_one();
         }
     };
-    
+
     funct_t host_resolfed_f = [&](struct kevent event)
     {
         parse_state* parse_ed;
@@ -143,7 +143,7 @@ public:
             parse_ed = ans.front();
             ans.pop_front();
         }
-    
+
         {
             std::unique_lock<std::mutex> lk(state);
             if (parse_ed->canceled) {
@@ -151,37 +151,37 @@ public:
                 return;
             }
         }
-        
+
         tcp_connection* connection = parse_ed -> connection;
         connection -> state = nullptr;
         delete parse_ed;
-        
+
         connection -> connect_to_server();
         connection -> make_request();
-        
+
         std::unique_lock<std::mutex> lk(ans_mutex);
         if (ans.size() != 0) {
             queue.trigger_user_event_handler(USER_EVENT_IDENT);
         }
     };
-    
-    funct_t connect_client_f = [&](struct kevent event) {
+
+    funct_t connect_client_f = [this](struct kevent event) {
         tcp_connection* connection = new tcp_connection(new client_socket(server), this);
         std::cout << "client connected: " << connection->get_client_sock() << "\n";
         queue.add_event_handler(connection->get_client_sock(), EVFILT_READ, [connection](struct kevent event){
             connection->client_handler(event);
         });
     };
-    
+
 private:
-    
+
     struct parse_state
     {
         parse_state(tcp_connection* connection) : connection(connection) {};
         tcp_connection* connection;
         bool canceled = false;
     };
-    
+
     struct tcp_connection
     {
     private:
@@ -190,7 +190,7 @@ private:
         tcp_client* client = nullptr;
         tcp_server* server = nullptr;
         proxy_server* parent;
-        
+
     public:
         tcp_connection(client_socket* client, proxy_server* parent) : client(new tcp_client(client)), parent(parent) {};
         ~tcp_connection() { std::cout << "tcp_connect deleted\n"; }
@@ -204,9 +204,9 @@ private:
         void try_to_cache(tcp_server* server);
         void server_handler(struct kevent event);
         void client_handler(struct kevent event);
-        
+
         parse_state* state = nullptr;
-        
+
     private:
         void add_request_text(std::string text);
         void read_request_f(struct kevent event);
@@ -218,17 +218,17 @@ private:
                 std::cout << socket->get_socket() << " client deleted\n";
                 delete socket;
             };
-            
+
             client_socket* socket;
-            
+
             int get_socket() { return socket->get_socket(); }
-            
+
             std::string request;
             std::string host;
             std::string URI;
             struct addrinfo addrinfo;
         };
-        
+
         struct tcp_server
         {
             tcp_server(client_socket* socket) : socket(socket) {}
@@ -237,9 +237,9 @@ private:
                 std::cout << socket->get_socket() << " server deleted\n";
                 delete socket;
             }
-            
+
             int get_socket() { return socket->get_socket(); }
-            
+
             client_socket* socket;
             struct addrinfo addrinfo;
             std::string response;
@@ -249,8 +249,5 @@ private:
         };
     };
 };
-
-
-
 
 #endif /* proxy_hpp */
