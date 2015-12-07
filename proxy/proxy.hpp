@@ -12,8 +12,10 @@
 #include <list>
 #include <mutex>
 #include <condition_variable>
-#include <netdb.h>
 #include <err.h>
+#include <sys/types.h>
+#include <sys/socket.h>
+#include <netdb.h>
 
 #include "kqueue.hpp"
 #include "utils.hpp"
@@ -95,7 +97,7 @@ public:
             struct addrinfo hints, *res;
             
             memset(&hints, 0, sizeof(hints));
-            hints.ai_family = PF_INET;
+            hints.ai_family = AF_INET;
             hints.ai_socktype = SOCK_STREAM;
             hints.ai_flags = hints.ai_flags | AI_NUMERICSERV;
             std::string port = "80";

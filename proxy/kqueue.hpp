@@ -9,6 +9,7 @@
 #ifndef kqueue_hpp
 #define kqueue_hpp
 
+#include <sys/types.h>
 #include <sys/event.h>
 #include <map>
 #include <vector>
