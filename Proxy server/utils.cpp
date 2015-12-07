@@ -28,6 +28,13 @@ client_socket::client_socket(server_socket* server)
     if (setsockopt(socket, SOL_SOCKET, SO_NOSIGPIPE, &set, sizeof(set)) == -1) { // NOSIGPIPE FOR SEND
         throw_error(errno, "setsockopt()");
     };
+    
+    int flags;
+    if (-1 == (flags = fcntl(socket, F_GETFL, 0)))
+        flags = 0;
+    if (fcntl(socket, F_SETFL, flags | O_NONBLOCK) == -1) {
+        throw_error(errno, "fcntl()");
+    }
 }
 
 client_socket::client_socket(struct addrinfo addrinfo)
@@ -59,6 +66,13 @@ client_socket::client_socket(struct addrinfo addrinfo)
 
 server_socket::server_socket(int port): port(port) {
     socket = ::socket(AF_INET, SOCK_STREAM, 0);
+    
+    int flags;
+    if (-1 == (flags = fcntl(socket, F_GETFL, 0)))
+        flags = 0;
+    if (fcntl(socket, F_SETFL, flags | O_NONBLOCK) == -1) {
+        throw_error(errno, "fcntl()");
+    }
 }
 
 void server_socket::bind_and_listen()

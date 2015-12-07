@@ -115,7 +115,7 @@ public:
             std::unique_lock<std::mutex> lk2(state);
                 if (!parse_ed->canceled) {
                     parse_ed->connection->set_addrinfo(*res);
-                    cache.put(name, *res);
+                    cache.put(name, *res); // BUG!!!!!! one name for all ports
                 } else {
                     delete parse_ed;
                     continue;
@@ -129,20 +129,20 @@ public:
         }
     };
     
-    parse_state* get_next()
-    {
-        std::unique_lock<std::mutex> lk1(ans_mutex);
-        parse_state* state = ans.front();
-        ans.pop_front();    // bad free sometimes
-        return state;
-    }
-    
     funct_t host_resolfed_f = [&](struct kevent event)
     {
-        parse_state* parse_ed = get_next();
-        
+        parse_state* parse_ed;
         {
-            std::unique_lock<std::mutex> lk1(state);
+            std::unique_lock<std::mutex> lk(ans_mutex);
+            if (ans.size() == 0) {
+                return;
+            }
+            parse_ed = ans.front();
+            ans.pop_front();
+        }
+    
+        {
+            std::unique_lock<std::mutex> lk(state);
             if (parse_ed->canceled) {
                 delete parse_ed;
                 return;
@@ -156,7 +156,7 @@ public:
         connection -> connect_to_server();
         connection -> make_request();
         
-        std::unique_lock<std::mutex> lk2(ans_mutex);
+        std::unique_lock<std::mutex> lk(ans_mutex);
         if (ans.size() != 0) {
             queue.trigger_user_event_handler(USER_EVENT_IDENT);
         }
