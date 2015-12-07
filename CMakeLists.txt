@@ -16,4 +16,4 @@ set(SOURCE_FILES
         "proxy/utils.cpp"
         "proxy/utils.hpp")
 
-add_executable(proxy ${SOURCE_FILES})
+add_executable(proxy_server ${SOURCE_FILES})
