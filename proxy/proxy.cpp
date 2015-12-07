@@ -171,8 +171,10 @@ void proxy_server::tcp_connection::server_handler(struct kevent event)
         server = nullptr;
     } else {
         char buff[event.data];
+        std::cout << "read from " << get_server_sock() << "\n";
         size_t size = read(get_server_sock(), buff, event.data);
         server->response.append({buff, size});
+        std::cout << "write to " << get_client_sock() << "\n";
         write(get_client_sock(), buff, size);
     }
 }

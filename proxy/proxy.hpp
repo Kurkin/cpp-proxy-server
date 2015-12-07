@@ -109,6 +109,7 @@ public:
             
             int error = getaddrinfo(name.c_str(), port.c_str(), &hints, &res);
             if (error) {
+                perror(name.c_str());
                 perror(gai_strerror(error));
                 continue;
             }
