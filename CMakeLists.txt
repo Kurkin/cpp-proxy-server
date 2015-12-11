@@ -4,8 +4,8 @@ project(proxy)
 set(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} -std=c++11")
 
 set(SOURCE_FILES
-        "proxy/http_handler.cpp"
-        "proxy/http_handler.hpp"
+        "proxy/new_http_handler.cpp"
+        "proxy/new_http_handler.hpp"
         "proxy/kqueue.cpp"
         "proxy/kqueue.hpp"
         "proxy/main.cpp"
