@@ -88,7 +88,6 @@ public:
                 std::unique_lock<std::mutex> lk2(state);
                 if (!parse_ed->canceled) {
                     parse_ed->connection->set_addrinfo(cache.get(name));
-                    std::cout << "ip " << inet_ntoa(((sockaddr_in *) cache.get(name).ai_addr)->sin_addr) << " host " << name << "\n";
                 } else {
                     delete parse_ed;
                     continue;
@@ -120,8 +119,6 @@ public:
                 perror(gai_strerror(error));
                 continue;
             }
-
-            std::cout << "ip " << inet_ntoa(((sockaddr_in *) res->ai_addr)->sin_addr) << " host " << name << "\n";
             
             std::unique_lock<std::mutex> lk1(ans_mutex);
             std::unique_lock<std::mutex> lk2(state);
