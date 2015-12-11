@@ -23,13 +23,16 @@ void request::update_state() {
         state = FIRST_LINE;
         parse_request_line();
     }
-    if (body_start == 0 || body_start == std::string::npos) {
+    if (state == FIRST_LINE && (body_start == 0 || body_start == std::string::npos)) {
         body_start = text.find("\r\n\r\n");
     }
-    if (state == FIRST_LINE && body_start != std::string::npos) {
+    if (state == FIRST_LINE && body_start != std::string::npos && body_start != 0) {
         state = FULL_HEADERS;
         body_start = parse_headers();
         host = headers.at("Host");
+        if (host == "") {
+            throw std::runtime_error("emty host");
+        }
         check_body();
     }
 }
@@ -76,7 +79,8 @@ void request::check_body() {
     
     if (get_header("Content-Length") != "")
     {
-        if (text.length() == static_cast<size_t>(std::stoi(get_header("Content-Length")))) {
+        std::cout << body.size() << " " << std::stoi(get_header("Content-Length")) << "\n";
+        if (body.size() == static_cast<size_t>(std::stoi(get_header("Content-Length")))) {
             state = FULL_BODY;
         } else {
             state = PARTICAL_BODY;
@@ -84,13 +88,13 @@ void request::check_body() {
     }
     else if (get_header("Transfer-Encoding") == "chunked")
     {
-        if (std::string(text.end() - 7, text.end()) == "\r\n0\r\n\r\n") {
+        if (std::string(body.end() - 7, body.end()) == "\r\n0\r\n\r\n") {
             state = FULL_BODY;
         } else {
             state = PARTICAL_BODY;
         }
     }
-    else
+    else if (body.size() == 0)
     {
         state = FULL_BODY;
     }
