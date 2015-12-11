@@ -31,12 +31,12 @@ client_socket::client_socket(server_socket* server)
         throw_error(errno, "setsockopt()");
     };
     
-//    int flags;
-//    if (-1 == (flags = fcntl(socket, F_GETFL, 0)))
-//        flags = 0;
-//    if (fcntl(socket, F_SETFL, flags | O_NONBLOCK) == -1) {
-//        throw_error(errno, "fcntl()");
-//    }
+    int flags;
+    if (-1 == (flags = fcntl(socket, F_GETFL, 0)))
+        flags = 0;
+    if (fcntl(socket, F_SETFL, flags | O_NONBLOCK) == -1) {
+        throw_error(errno, "fcntl()");
+    }
 }
 
 client_socket::client_socket(struct addrinfo addrinfo)
@@ -51,12 +51,12 @@ client_socket::client_socket(struct addrinfo addrinfo)
         throw_error(errno, "setsockopt()");
     };
     
-//    int flags;
-//    if (-1 == (flags = fcntl(socket, F_GETFL, 0)))
-//        flags = 0;
-//    if (fcntl(socket, F_SETFL, flags | O_NONBLOCK) == -1) {
-//        throw_error(errno, "fcntl()");
-//    }
+    int flags;
+    if (-1 == (flags = fcntl(socket, F_GETFL, 0)))
+        flags = 0;
+    if (fcntl(socket, F_SETFL, flags | O_NONBLOCK) == -1) {
+        throw_error(errno, "fcntl()");
+    }
     
     std::cout << "connecting to " << inet_ntoa(((sockaddr_in *) addrinfo.ai_addr)->sin_addr) << " on sock " << socket << "\n";
     if (connect(socket,  addrinfo.ai_addr, addrinfo.ai_addrlen) < 0) {

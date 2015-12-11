@@ -103,8 +103,4 @@ void io_queue::watch_loop() {
             }
         }
     }
-}
-
-void write(int dis, const char* message, size_t size) {
-    send(dis, message, size, 0);
-}
+} 

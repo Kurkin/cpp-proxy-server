@@ -1,3 +1,7 @@
 *.xcodeproj
 .idea/
 PerformanceTest/
+CMake*
+*.build
+Debug
+cmake*

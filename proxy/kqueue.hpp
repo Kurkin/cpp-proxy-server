@@ -38,5 +38,4 @@ private:
     bool finished = false;
 };
 
-void write(int dis, const char* message, size_t size);
 #endif /* kqueue_hpp */

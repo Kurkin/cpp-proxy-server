@@ -27,20 +27,6 @@ private:
     std::string body;
 };
 
-struct request : public http
-{
-    request(std::string);
-
-    std::string get_method() const { return method; }
-    std::string get_URI() const { return URI; }
-    std::string make_request() const;
-private:
-    std::string method;
-    std::string URI;
-    std::string http_version;
-    std::string other;
-};
-
 struct response : public http
 {
     response(std::string);

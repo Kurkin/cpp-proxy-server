@@ -14,7 +14,7 @@
 
 io_queue queue;
 
-int main(int argc, const char * argv[])
+int main()
 {  
 
     signal(SIGTERM, [](int sig){ queue.hard_stop(); });

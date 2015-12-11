@@ -16,10 +16,12 @@
 #include <sys/types.h>
 #include <sys/socket.h>
 #include <netdb.h>
+#include <deque>
 
 #include "kqueue.hpp"
 #include "utils.hpp"
-#include "http_handler.hpp"
+#include "new_http_handler.hpp"
+#include "throw_error.h"
 
 #define BUFF_SIZE 1024
 #define USER_EVENT_IDENT 0x5c0276ef
@@ -43,8 +45,7 @@ private:
 
     io_queue& queue;
 
-    lru_cache<std::string, response> cache;
-    lru_cache<std::string, std::string> permanent_moved;
+    lru_cache<std::string, std::string> cache; // todo: <uri, cache ans>, cache ans should be a struct
 
 public:
     proxy_server(io_queue& queue, int port);
@@ -101,7 +102,7 @@ public:
             hints.ai_socktype = SOCK_STREAM;
             hints.ai_flags = hints.ai_flags | AI_NUMERICSERV;
             std::string port = "80";
-            if (name.find(":") != -1) {
+            if (name.find(":") != static_cast<size_t>(-1)) {
                 size_t port_str = name.find(":");
                 port = name.substr(port_str + 1);
                 name = name.erase(port_str);
@@ -173,8 +174,8 @@ public:
         });
     };
 
+    
 private:
-
     struct parse_state
     {
         parse_state(tcp_connection* connection) : connection(connection) {};
@@ -185,30 +186,78 @@ private:
     struct tcp_connection
     {
     private:
+        struct write_part {
+            std::string text;
+            size_t writted = 0;
+            
+            write_part(std::string text) : text(text) {};
+            const char* get_part_text() const { return text.data() + writted; };
+            size_t get_part_size() const { return text.size() - writted; }
+        };
         struct tcp_client;
         struct tcp_server;
         tcp_client* client = nullptr;
         tcp_server* server = nullptr;
         proxy_server* parent;
+        std::deque<write_part> msg_to_server;
+        std::deque<write_part> msg_to_client;
 
+        void write(int fd, std::string text) {
+            std::deque<write_part>* deque;
+            if (fd == get_client_sock()) {
+                deque = &msg_to_client;
+            } else {
+                deque = &msg_to_server;
+            }
+            if (deque->empty()) {
+                deque->push_back(write_part(text));
+                parent->queue.add_event_handler(fd, EVFILT_WRITE, [this, deque](struct kevent event){
+                    if (deque->empty()) {
+                        parent->queue.delete_event_handler(event.ident, EVFILT_WRITE);
+                        return;
+                    }
+                    write_part part = deque->front();
+                    deque->pop_front();
+                    std::cout << "write to " << event.ident << "\n";
+                    std::cout << part.get_part_size() << "\n";
+                    size_t writted = ::write(event.ident, part.get_part_text(), part.get_part_size());
+                    if (writted == -1) {
+                        if (errno != EPIPE) {
+                            throw_error(errno, "write()");
+                        } else {
+                            if (part.get_part_size() != 0) {
+                                deque->push_front(part);
+                            }
+                        }
+                    } else {
+                        part.writted += writted;
+                        if (part.get_part_size() != 0) {
+                            deque->push_front(part);
+                        }
+                    }
+                });
+            } else {
+                deque->push_back(write_part(text));
+            }
+        }
+        
     public:
         tcp_connection(client_socket* client, proxy_server* parent) : client(new tcp_client(client)), parent(parent) {};
         ~tcp_connection() { std::cout << "tcp_connect deleted\n"; }
-        int get_client_sock() { return client->get_socket(); }
-        int get_server_sock() { return server->get_socket(); }
-        std::string get_host() { return client->host; }
-        std::string get_URI() { return client->URI; }
+        int get_client_sock() const { return client->get_socket(); }
+        int get_server_sock() const { return server->get_socket(); }
+        std::string get_host() const { return client->request->get_host(); }
+        std::string get_URI() const { return client->request->get_URI(); }
         void set_addrinfo(struct addrinfo addrinfo) { client->addrinfo = addrinfo; }
         void connect_to_server();
         void make_request();
-        void try_to_cache(tcp_server* server);
+        void try_to_cache();
         void server_handler(struct kevent event);
         void client_handler(struct kevent event);
 
         parse_state* state = nullptr;
 
     private:
-        void add_request_text(std::string text);
         void read_request_f(struct kevent event);
 
         struct tcp_client {
@@ -217,15 +266,13 @@ private:
             {
                 std::cout << socket->get_socket() << " client deleted\n";
                 delete socket;
+                delete request;
             };
 
+            int get_socket() const { return socket->get_socket(); }
+
             client_socket* socket;
-
-            int get_socket() { return socket->get_socket(); }
-
-            std::string request;
-            std::string host;
-            std::string URI;
+            struct request* request = nullptr;
             struct addrinfo addrinfo;
         };
 
@@ -238,12 +285,11 @@ private:
                 delete socket;
             }
 
-            int get_socket() { return socket->get_socket(); }
+            int get_socket() const { return socket->get_socket(); }
 
             client_socket* socket;
             struct addrinfo addrinfo;
-            std::string response;
-            std::string request;
+            struct response* response = nullptr;
             std::string host;
             std::string URI;
         };
