@@ -67,10 +67,10 @@ void proxy_server::tcp_connection::read_request_f(struct kevent event)
         client->request->add_part({buff, size});
     }
     std::cout << std::string(buff, size) << "\n";
-    if (get_host() == "") {
-        throw std::runtime_error("empty host 1");
-    }
     if (client->request->get_state() == FULL_BODY) {
+        if (get_host() == "") {
+            throw std::runtime_error("empty host 1");
+        }
         if (state) delete state;
         state = new parse_state(this);
         parent->resolve(state);
