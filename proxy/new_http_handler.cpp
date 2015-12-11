@@ -33,6 +33,8 @@ void request::update_state() {
         if (host == "") {
             throw std::runtime_error("emty host");
         }
+    }
+    if (state >= FULL_HEADERS) {
         check_body();
     }
 }
