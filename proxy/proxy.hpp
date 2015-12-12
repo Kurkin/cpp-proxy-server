@@ -79,15 +79,18 @@ public:
                 }
             }
 
-            if (name == "") {
-                throw std::runtime_error("empty Host");
+            std::string port = "80";
+            if (name.find(":") != static_cast<size_t>(-1)) {
+                size_t port_str = name.find(":");
+                port = name.substr(port_str + 1);
+                name = name.erase(port_str);
             }
             
-            if (cache.contain(name)) {
+            if (cache.contain(name + port)) {
                 std::unique_lock<std::mutex> lk1(ans_mutex);
                 std::unique_lock<std::mutex> lk2(state);
                 if (!parse_ed->canceled) {
-                    parse_ed->connection->set_addrinfo(cache.get(name));
+                    parse_ed->connection->set_addrinfo(cache.get(name + port));
                 } else {
                     delete parse_ed;
                     continue;
@@ -106,16 +109,10 @@ public:
             hints.ai_family = AF_INET;
             hints.ai_socktype = SOCK_STREAM;
             hints.ai_flags = hints.ai_flags | AI_NUMERICSERV;
-            std::string port = "80";
-            if (name.find(":") != static_cast<size_t>(-1)) {
-                size_t port_str = name.find(":");
-                port = name.substr(port_str + 1);
-                name = name.erase(port_str);
-            }
-
+            
             int error = getaddrinfo(name.c_str(), port.c_str(), &hints, &res);
             if (error) {
-                std::cout << name << "\n";
+                std::cout << name + ":" + port << "\n";
                 perror(gai_strerror(error));
                 continue;
             }
@@ -124,7 +121,7 @@ public:
             std::unique_lock<std::mutex> lk2(state);
                 if (!parse_ed->canceled) {
                     parse_ed->connection->set_addrinfo(*res);
-                    cache.put(name, *res); // BUG!!!!!! one name for all ports
+                    cache.put(name + port, *res);
                 } else {
                     delete parse_ed;
                     continue;
@@ -224,7 +221,6 @@ private:
                     write_part part = deque->front();
                     deque->pop_front();
                     std::cout << "write to " << event.ident << "\n";
-                    std::cout << part.get_part_size() << "\n";
                     size_t writted = ::write(event.ident, part.get_part_text(), part.get_part_size());
                     if (writted == -1) {
                         if (errno != EPIPE) {
@@ -263,7 +259,7 @@ private:
         parse_state* state = nullptr;
 
     private:
-        void read_request_f(struct kevent event);
+        void read_request(struct kevent event);
 
         struct tcp_client {
             tcp_client(client_socket* client) : socket(client) {};
@@ -275,7 +271,7 @@ private:
             };
 
             int get_socket() const { return socket->get_socket(); }
-
+            
             client_socket* socket;
             struct request* request = nullptr;
             struct addrinfo addrinfo;

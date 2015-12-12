@@ -12,14 +12,16 @@
 #include "throw_error.h"
 #include "new_http_handler.hpp"
 
-void proxy_server::resolve(parse_state* state) {
+void proxy_server::resolve(parse_state* state)
+{
     std::lock_guard<std::mutex> lk(queue_mutex);
     host_names.push_back(state);
     queue_ready = true;
     queue_cond.notify_one();
 }
 
-proxy_server::proxy_server(io_queue& queue, int port): queue(queue), cache(10000) {
+proxy_server::proxy_server(io_queue& queue, int port): queue(queue), cache(10000)
+{
     server = new server_socket(port);
     server->bind_and_listen();
     
@@ -27,13 +29,15 @@ proxy_server::proxy_server(io_queue& queue, int port): queue(queue), cache(10000
     queue.add_event_handler(USER_EVENT_IDENT, EVFILT_USER, EV_CLEAR, host_resolfed_f);
 }
 
-proxy_server::~proxy_server() {
+proxy_server::~proxy_server()
+{
     queue.delete_event_handler(server->get_socket(), EVFILT_READ);
     queue.delete_event_handler(USER_EVENT_IDENT, EVFILT_USER);
     delete server;
 }
 
-void proxy_server::tcp_connection::client_handler(struct kevent event) {
+void proxy_server::tcp_connection::client_handler(struct kevent event)
+{
     if (event.flags & EV_EOF) {
         std::cout << "EV_EOF from " << event.ident << " client\n";
         std::unique_lock<std::mutex> lk(parent->state);
@@ -47,11 +51,11 @@ void proxy_server::tcp_connection::client_handler(struct kevent event) {
         }
         delete this;
     } else {
-        read_request_f(event);
+        read_request(event);
     }
 }
 
-void proxy_server::tcp_connection::read_request_f(struct kevent event)
+void proxy_server::tcp_connection::read_request(struct kevent event)
 {
     char buff[event.data];
     
@@ -68,6 +72,7 @@ void proxy_server::tcp_connection::read_request_f(struct kevent event)
     }
     std::cout << "added to requests\n";
     if (client->request->get_state() == BAD) {
+        std::cout << "Bad Request\n";
         write(get_client_sock(), "HTTP/1.1 400 Bad Request\r\n\r\n");
         parent->queue.delete_event_handler(get_client_sock(), EVFILT_READ);
     }
@@ -89,8 +94,8 @@ void proxy_server::tcp_connection::connect_to_server()
         {
             std::cout << "keep-alive is working!\n";
             try_to_cache();
-//            delete server->response;
-//            server->response = nullptr;
+            delete server->response;
+            server->response = nullptr;
             server->URI = client->request->get_URI();
             return;
         } else {
@@ -109,14 +114,12 @@ void proxy_server::tcp_connection::connect_to_server()
 
 void proxy_server::tcp_connection::make_request()
 {
-//    if (parent->cache.contain(client->request->get_URI())) {
-//        auto cache_response =  parent->cache.get(client->request->get_URI());
-//        std::cout << "cache is working!\n";
-//        write(get_client_sock(), cache_response.c_str(), cache_response.size());
-//        delete client->request;
-//        client->request = nullptr;
-//        return;
-//    }
+    if (!client->request->is_validating() && parent->cache.contain(get_host() + get_URI())) {
+        std::cout << "cache is working!\n"; // TODO: validate cache use if_match
+        auto cache_response =  parent->cache.get(get_host() + get_URI());
+        write(get_client_sock(), cache_response);
+        return;
+    }
     
     std::cout << "tcp_pair: client: " << get_client_sock() << " server: " << get_server_sock() << "\n";
     
@@ -134,34 +137,26 @@ void proxy_server::tcp_connection::server_handler(struct kevent event)
         std::cout << "EV_EOF from " << event.ident << " server\n";
         try_to_cache();
         parent->queue.delete_event_handler(get_server_sock(), EVFILT_READ);
+        msg_to_server.erase(msg_to_server.begin(), msg_to_server.end());
         delete server;
         server = nullptr;
     } else {
         char buff[event.data];
         std::cout << "read from " << get_server_sock() << "\n";
         size_t size = recv(get_server_sock(), buff, event.data, 0);
-//        if (server->response == nullptr) {
-//            server->response = new response({buff,size});
-//        } else {
-//            server->response->add_part({buff, size});
-//        }
+        if (server->response == nullptr) {
+            server->response = new response({buff,size});
+        } else {
+            server->response->add_part({buff, size});
+        }
         write(get_client_sock(), {buff, size});
     }
 }
 
 void proxy_server::tcp_connection::try_to_cache()
 {
-//    if (server->response->is_cahcable()) {
-//        std::cout << "add to cachce: " << server->URI  <<  " " << response.get_header("ETag") << "\n";
-//        parent->cache.put(server->URI, server->response->make_cache_response());
-//    }
-//    if (response.get_header("ETag") != "" && response.get_header("Content-Length") != ""
-//        && response.get_body().length() == std::stoi(response.get_header("Content-Length"))
-//        && response.get_header("Vary") == "" && response.get_code() == "200"
-//        && response.get_header("If-Match") == ""
-//        && response.get_header("If-Modified-Since") == ""
-//        && response.get_header("If-None-Match") == ""
-//        && response.get_header("If-Range") == ""
-//        && response.get_header("If-Unmodified-Since") == "")
-//    {
+    if (server->response->is_cacheable()) {
+        std::cout << "add to cache: " << server->host + server->URI  <<  " " << server->response->get_header("ETag") << "\n";
+        parent->cache.put(server->host + server->URI, server->response->get_text());
+    }
 }

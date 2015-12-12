@@ -18,61 +18,61 @@
 #include <iostream>
 #include <map>
 
-struct request
+struct http
 {
-    request(std::string);
-    int add_part(std::string);
+    http(std::string text) : text(text) {}
+    virtual ~http() = 0;
+    void add_part(std::string);
     
-    std::string get_method() const { return method; }
-    std::string get_URI() const { return URI; }
+    int get_state() { return state; };
     std::string get_header(std::string) const;
     std::string get_body() const { return body; }
-    std::string get_host() const { return host; }
-    int get_state() { return state; };
-    std::string get_request_text();
+    std::string get_text() const { return text; }
     
-private:
+protected:
     void update_state();
     void check_body();
-    int parse_headers();
-    void parse_request_line();
-    
+    void parse_headers();
+    virtual void parse_first_line() = 0;
+
     int state = 0;
     size_t body_start = 0;
     std::string text;
-    std::string method;
-    std::string URI;
-    std::string http_version;
-    std::string host;
     std::string body;
     std::map<std::string, std::string> headers;
 };
 
-struct response {
-    response(std::string text) : text(text) { update_state(); }
-    void add_part(std::string part) {
-        text.append(part);
-    }
-    int get_state() {
-        update_state();
-        return state;
-    };
-    std::string get_header(std::string) const;
+struct request : public http
+{
+    request(std::string text) : http(text) { update_state(); };
+    
+    std::string get_method() const { return method; }
+    std::string get_URI() const { return URI; }
+    std::string get_host();
+    std::string get_request_text();
+    bool is_validating() const;
     
 private:
-    void update_state();
-    void check_body();
-    int parse_headers();
-    void parse_response_line();
+    void parse_first_line() override;
+
+    std::string method;
+    std::string URI;
+    std::string http_version;
+    std::string host = "";
+};
+
+struct response : public http
+{
+    response(std::string text) : http(text) { update_state(); };
+    bool is_cacheable() const;
+    std::string get_code() const { return code; }
     
-    int state = 0;
-    size_t body_start = 0;
-    std::string text;
+private:
+    void parse_first_line() override;
+    
     std::string code;
     std::string code_description;
     std::string http_version;
-    std::string body;
-    std::map<std::string, std::string> headers;
 };
 
 #endif /* new_http_handler_hpp */
