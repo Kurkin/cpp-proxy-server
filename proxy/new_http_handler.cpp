@@ -32,7 +32,11 @@ void request::update_state() {
     if (state == FIRST_LINE && body_start != std::string::npos && body_start != 0) {
         state = FULL_HEADERS;
         body_start = parse_headers();
-        host = headers.at("Host");
+        host = get_header("Host");
+        if (host == "")
+            host = get_header("host");
+        if (method == "CONNECT")
+            host = URI;
         if (host == "") {
             throw std::runtime_error("emty host");
         }
