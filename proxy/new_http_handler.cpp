@@ -10,6 +10,9 @@
 
 
 std::string request::get_request_text() {  // todo: drop hop-by-hop headers
+    if (URI.find(host) == -1) {
+        return method + " " + URI + " " + http_version + "\r\n" + std::string(std::find_if(text.begin(), text.end(), [](char a) { return a == '\r'; }) + 2, text.end());
+    }
     return method + " " + URI.substr(URI.find(host) + host.size()) + " " + http_version + "\r\n"
         + std::string(std::find_if(text.begin(), text.end(), [](char a) { return a == '\r'; }) + 2, text.end());
 }
