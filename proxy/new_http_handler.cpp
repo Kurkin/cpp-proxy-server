@@ -46,10 +46,28 @@ void request::parse_request_line() {
     auto first_space = std::find_if(text.begin(), text.end(), [](char a) { return a == ' '; });
     auto second_space = std::find_if(first_space + 1, text.end(), [](char a) { return a == ' '; });
     auto crlf = std::find_if(second_space + 1, text.end(), [](char a) { return a == '\r'; });
-        
+    
+    if (first_space == text.end() || second_space == text.end() || crlf == text.end()) {
+        state = BAD;
+        return;
+    }
+    
     method = {text.begin(), first_space};
     URI = {first_space + 1, second_space};
     http_version = {second_space + 1, crlf};
+    
+    if (method != "POST" && method != "GET" && method != "CONNECT") {
+        state = BAD;
+        return;
+    }
+    if (URI == "") {
+        state = BAD;
+        return;
+    }
+    if (http_version != "HTTP/1.1" && http_version != "HTTP/1.0") {
+        state = BAD;
+        return;
+    }
 }
 
 int request::parse_headers() {

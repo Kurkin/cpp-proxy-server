@@ -28,7 +28,7 @@ struct request
     std::string get_header(std::string) const;
     std::string get_body() const { return body; }
     std::string get_host() const { return host; }
-    int get_state() { update_state(); return state; };
+    int get_state() { return state; };
     std::string get_request_text();
     
 private:

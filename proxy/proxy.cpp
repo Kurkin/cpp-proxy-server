@@ -60,14 +60,19 @@ void proxy_server::tcp_connection::read_request_f(struct kevent event)
     if (size == static_cast<size_t>(-1)) {
         throw_error(errno, "read()");
     }
-    
+    std::cout << std::string(buff, size) << "\n";
     if (client->request == nullptr) {
         client->request = new request({buff, size});
     } else {
         client->request->add_part({buff, size});
     }
-    std::cout << std::string(buff, size) << "\n";
+    std::cout << "added to requests\n";
+    if (client->request->get_state() == BAD) {
+        write(get_client_sock(), "HTTP/1.1 400 Bad Request\r\n\r\n");
+        parent->queue.delete_event_handler(get_client_sock(), EVFILT_READ);
+    }
     if (client->request->get_state() == FULL_BODY) {
+        std::cout << "push to resolve\n";
         if (get_host() == "") {
             throw std::runtime_error("empty host 1");
         }
