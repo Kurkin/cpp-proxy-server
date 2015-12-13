@@ -64,22 +64,23 @@ void proxy_server::tcp_connection::read_request(struct kevent event)
     if (size == static_cast<size_t>(-1)) {
         throw_error(errno, "read()");
     }
-    std::cout << std::string(buff, size) << "\n";
     if (client->request == nullptr) {
         client->request = new request({buff, size});
     } else {
         client->request->add_part({buff, size});
     }
-    std::cout << "added to requests\n";
     if (client->request->get_state() == BAD) {
         std::cout << "Bad Request\n";
         write(get_client_sock(), "HTTP/1.1 400 Bad Request\r\n\r\n");
         parent->queue.delete_event_handler(get_client_sock(), EVFILT_READ);
     }
     if (client->request->get_state() == FULL_BODY) {
-        std::cout << "push to resolve\n";
+        std::cout << "push to resolve " << get_host() << get_URI() << "\n";
         if (get_host() == "") {
-            throw std::runtime_error("empty host 1");
+            std::cout << "Bad Request\n";
+            write(get_client_sock(), "HTTP/1.1 400 Bad Request\r\n\r\n");
+            parent->queue.delete_event_handler(get_client_sock(), EVFILT_READ);
+            return;
         }
         if (state) delete state;
         state = new parse_state(this);
@@ -115,9 +116,11 @@ void proxy_server::tcp_connection::connect_to_server()
 void proxy_server::tcp_connection::make_request()
 {
     if (!client->request->is_validating() && parent->cache.contain(get_host() + get_URI())) {
-        std::cout << "cache is working!\n"; // TODO: validate cache use if_match
+        std::cout << "cache is working! for " << get_client_sock() << "\n"; // TODO: validate cache use if_match
         auto cache_response =  parent->cache.get(get_host() + get_URI());
         write(get_client_sock(), cache_response);
+        delete client->request;
+        client->request = nullptr;
         return;
     }
     
@@ -155,7 +158,7 @@ void proxy_server::tcp_connection::server_handler(struct kevent event)
 
 void proxy_server::tcp_connection::try_to_cache()
 {
-    if (server->response->is_cacheable()) {
+    if (server->response != nullptr && server->response->is_cacheable()) {
         std::cout << "add to cache: " << server->host + server->URI  <<  " " << server->response->get_header("ETag") << "\n";
         parent->cache.put(server->host + server->URI, server->response->get_text());
     }

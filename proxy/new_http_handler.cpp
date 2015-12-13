@@ -90,6 +90,13 @@ void http::check_body()
     }
 }
 
+std::string request::get_URI()
+{
+    if (URI.find(host) != -1)
+        URI = URI.substr(URI.find(host) + host.size());
+    return URI;
+}
+
 std::string request::get_host()
 {
     if (method == "CONNECT")
@@ -117,9 +124,6 @@ void request::parse_first_line()
     method = {text.begin(), first_space};
     URI = {first_space + 1, second_space};
     http_version = {second_space + 1, crlf};
-    
-    if (URI.find(host) != -1)
-        URI = URI.substr(URI.find(host) + host.size());
     
     if (method != "POST" && method != "GET" && method != "CONNECT") {
         state = BAD;

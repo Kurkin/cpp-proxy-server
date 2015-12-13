@@ -34,7 +34,7 @@ struct io_queue {
 private:
     std::map<std::pair<uintptr_t, int16_t>, funct_t> events_handlers;
     int ident;
-    std::vector<uintptr_t> deleted_idents;
+    std::vector<std::pair<uintptr_t, int16_t>> deleted_idents;
     bool finished = false;
 };
 

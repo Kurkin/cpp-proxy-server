@@ -47,7 +47,7 @@ struct request : public http
     request(std::string text) : http(text) { update_state(); };
     
     std::string get_method() const { return method; }
-    std::string get_URI() const { return URI; }
+    std::string get_URI();
     std::string get_host();
     std::string get_request_text();
     bool is_validating() const;
