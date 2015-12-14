@@ -92,7 +92,7 @@ void http::check_body()
 
 std::string request::get_URI()
 {
-    if (URI.find(host) != -1)
+    if (URI.find(host) != -1)  // bug!!
         URI = URI.substr(URI.find(host) + host.size());
     return URI;
 }

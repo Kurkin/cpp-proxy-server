@@ -48,7 +48,7 @@ void io_queue::delete_event_handler(uintptr_t ident, int16_t filter) {
     int fail = kevent(this->ident, &event, 1, NULL, 0, NULL);
     if (fail == -1) {
         if (errno != ENOENT)
-            throw_error(errno, "kevent(EV_DALETE)");
+            throw_error(errno, "kevent(EV_DELETE)");
     }
     deleted_idents.push_back({ident, filter});
     events_handlers.erase(std::pair<uintptr_t, int16_t>(ident, filter));
