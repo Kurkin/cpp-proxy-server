@@ -44,9 +44,11 @@ void proxy_server::tcp_connection::client_handler(struct kevent event)
         if (state) state->canceled = true;
         lk.unlock();
         parent->queue.delete_event_handler(get_client_sock(), EVFILT_READ);
+        parent->queue.delete_event_handler(get_client_sock(), EVFILT_WRITE);
         delete client;
         if (server) {
             parent->queue.delete_event_handler(get_server_sock(), EVFILT_READ);
+            parent->queue.delete_event_handler(get_server_sock(), EVFILT_WRITE);
             delete server;
         }
         delete this;
@@ -76,7 +78,7 @@ void proxy_server::tcp_connection::read_request(struct kevent event)
     }
     if (client->request->get_state() == FULL_BODY) {
         std::cout << "push to resolve " << get_host() << get_URI() << "\n";
-        if (get_host() == "") {
+        if (get_host() == "") { // todo: reduant check
             std::cout << "Bad Request\n";
             write(get_client_sock(), "HTTP/1.1 400 Bad Request\r\n\r\n");
             parent->queue.delete_event_handler(get_client_sock(), EVFILT_READ);
@@ -102,6 +104,8 @@ void proxy_server::tcp_connection::connect_to_server()
         } else {
             std::cout << "delete old server" << get_server_sock() << "\n";
             parent->queue.delete_event_handler(get_server_sock(), EVFILT_READ);
+            parent->queue.delete_event_handler(get_server_sock(), EVFILT_WRITE);
+            msg_to_server.erase(msg_to_server.begin(), msg_to_server.end());
             try_to_cache();
             delete server;
             server = nullptr;
@@ -136,10 +140,11 @@ void proxy_server::tcp_connection::make_request()
 
 void proxy_server::tcp_connection::server_handler(struct kevent event)
 {
-    if (event.flags & EV_EOF && event.data == 0) {
+    if (event.flags & EV_EOF && event.data == 0) {  // TODO: check for errors!
         std::cout << "EV_EOF from " << event.ident << " server\n";
         try_to_cache();
         parent->queue.delete_event_handler(get_server_sock(), EVFILT_READ);
+        parent->queue.delete_event_handler(get_server_sock(), EVFILT_WRITE);
         msg_to_server.erase(msg_to_server.begin(), msg_to_server.end());
         delete server;
         server = nullptr;

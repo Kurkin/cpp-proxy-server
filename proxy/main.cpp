@@ -24,11 +24,11 @@ int main()
     std::thread dns_resolver1(proxy.resolver);
     std::thread dns_resolver2(proxy.resolver);
 
-    try {
+//    try {
         queue.watch_loop();
-    } catch (std::runtime_error error){
-        std::cout << error.what() << "\n";
-    }
+//    } catch (std::runtime_error error){
+//        std::cout << error.what() << "\n";
+//    }
 
     return 0;
 }
