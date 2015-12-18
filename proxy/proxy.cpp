@@ -20,12 +20,12 @@ void proxy_server::resolve(parse_state* state)
     queue_cond.notify_one();
 }
 
-proxy_server::proxy_server(io_queue& queue, int port): queue(queue), cache(10000), server(server_socket(port))
+proxy_server::proxy_server(io_queue& queue, int port): server(server_socket(port)), queue(queue), cache(10000)
 {
     server.bind_and_listen();
     
-    queue.add_event_handler(server.getfd(), EVFILT_READ, connect_client_f);
-    queue.add_event_handler(USER_EVENT_IDENT, EVFILT_USER, EV_CLEAR, host_resolfed_f);
+    queue.add_event_handler(server.getfd(), EVFILT_READ, connect_client);
+    queue.add_event_handler(USER_EVENT_IDENT, EVFILT_USER, EV_CLEAR, host_resolfed);
 }
 
 proxy_server::~proxy_server()
@@ -34,141 +34,53 @@ proxy_server::~proxy_server()
     queue.delete_event_handler(USER_EVENT_IDENT, EVFILT_USER);
 }
 
-proxy_server::tcp_connection::~tcp_connection()
-{
-    std::unique_lock<std::mutex> lk(parent->state);
+proxy_server::proxy_tcp_connection::proxy_tcp_connection(io_queue& queue, tcp_client&& client)
+    : tcp_connection(queue, std::move(client)) {}
+
+proxy_server::proxy_tcp_connection::~proxy_tcp_connection() {
+    if (request)
+        delete request;
+    if (response)
+        delete response;
     if (state)
-        state->canceled = true;
-    lk.unlock();
-    parent->queue.delete_event_handler(get_client_sock(), EVFILT_READ);
-    parent->queue.delete_event_handler(get_client_sock(), EVFILT_WRITE);
-    delete client;
-    if (server) {
-        parent->queue.delete_event_handler(get_server_sock(), EVFILT_READ);
-        parent->queue.delete_event_handler(get_server_sock(), EVFILT_WRITE);
-        delete server;
-    }
+        delete state;
 }
 
-void proxy_server::tcp_connection::client_handler(struct kevent event)
+std::string proxy_server::proxy_tcp_connection::get_host() const noexcept
 {
-    if (event.flags & EV_EOF) {
-        std::cout << "EV_EOF from " << event.ident << " client\n";
-        delete this;
-    } else {
-        read_request(event);
-    }
+    return request->get_host();
 }
 
-void proxy_server::tcp_connection::read_request(struct kevent event)
-{
-    char buff[event.data];
-    
-    std::cout << "read request of " << event.ident << "\n";
-    size_t size = read(get_client_sock(), buff, event.data);
-    if (size == static_cast<size_t>(-1)) {
-        throw_error(errno, "read()");
-    }
-    if (client->request == nullptr) {
-        client->request = new request({buff, size});
-    } else {
-        client->request->add_part({buff, size});
-    }
-    if (client->request->get_state() == BAD) {
-        std::cout << "Bad Request\n";
-        write(get_client_sock(), "HTTP/1.1 400 Bad Request\r\n\r\n");
-        parent->queue.delete_event_handler(get_client_sock(), EVFILT_READ);
-    }
-    if (client->request->get_state() == FULL_BODY) {
-        std::cout << "push to resolve " << get_host() << get_URI() << "\n";
-        if (get_host() == "") { // todo: reduant check
-            std::cout << "Bad Request\n";
-            write(get_client_sock(), "HTTP/1.1 400 Bad Request\r\n\r\n");
-            parent->queue.delete_event_handler(get_client_sock(), EVFILT_READ);
-            return;
-        }
-        if (state) delete state;
-        state = new parse_state(this);
-        parent->resolve(state);
-    }
+void proxy_server::proxy_tcp_connection::set_client_addrinfo(addrinfo addr) {
+    client_addr = addr;
 }
 
+//void proxy_server::tcp_connection::make_request()
+//{
+//    if (!client->request->is_validating() && parent->cache.contain(get_host() + get_URI())) {
+//        std::cout << "cache is working! for " << get_client_sock() << "\n"; // TODO: validate cache use if_match
+//        auto cache_response =  parent->cache.get(get_host() + get_URI());
+//        write(get_client_sock(), cache_response);
+//        delete client->request;
+//        client->request = nullptr;
+//        return;
+//    }
+//    
+//    std::cout << "tcp_pair: client: " << get_client_sock() << " server: " << get_server_sock() << "\n";
+//    
+//    write(get_server_sock(), client->request->get_request_text());
+//    delete client->request;
+//    client->request = nullptr;
+//    parent->queue.add_event_handler(get_server_sock(), EVFILT_READ, [this](struct kevent event){
+//        server_handler(event);
+//    });
+//}
 
-void proxy_server::tcp_connection::connect_to_server()
-{
-    if (server) {
-        if (client->request->get_host() == server->host)
-        {
-            std::cout << "keep-alive is working!\n";
-            try_to_cache();
-            delete server->response;
-            server->response = nullptr;
-            server->URI = client->request->get_URI();
-            return;
-        } else {
-            std::cout << "delete old server" << get_server_sock() << "\n";
-            parent->queue.delete_event_handler(get_server_sock(), EVFILT_READ);
-            parent->queue.delete_event_handler(get_server_sock(), EVFILT_WRITE);
-            msg_to_server.erase(msg_to_server.begin(), msg_to_server.end());
-            try_to_cache();
-            delete server;
-            server = nullptr;
-        }
-    }
-    
-    server = new tcp_server(client_socket(client->addrinfo));
-    server->host = client->request->get_host();
-    server->URI = client->request->get_URI();
-}
 
-void proxy_server::tcp_connection::make_request()
-{
-    if (!client->request->is_validating() && parent->cache.contain(get_host() + get_URI())) {
-        std::cout << "cache is working! for " << get_client_sock() << "\n"; // TODO: validate cache use if_match
-        auto cache_response =  parent->cache.get(get_host() + get_URI());
-        write(get_client_sock(), cache_response);
-        delete client->request;
-        client->request = nullptr;
-        return;
-    }
-    
-    std::cout << "tcp_pair: client: " << get_client_sock() << " server: " << get_server_sock() << "\n";
-    
-    write(get_server_sock(), client->request->get_request_text());
-    delete client->request;
-    client->request = nullptr;
-    parent->queue.add_event_handler(get_server_sock(), EVFILT_READ, [this](struct kevent event){
-        server_handler(event);
-    });
-}
-
-void proxy_server::tcp_connection::server_handler(struct kevent event)
-{
-    if (event.flags & EV_EOF && event.data == 0) {  // TODO: check for errors!
-        std::cout << "EV_EOF from " << event.ident << " server\n";
-        try_to_cache();
-        parent->queue.delete_event_handler(get_server_sock(), EVFILT_READ);
-        parent->queue.delete_event_handler(get_server_sock(), EVFILT_WRITE);
-        msg_to_server.erase(msg_to_server.begin(), msg_to_server.end());
-        delete server;
-        server = nullptr;
-    } else {
-        char buff[event.data];
-        std::cout << "read from " << get_server_sock() << "\n";
-        size_t size = recv(get_server_sock(), buff, event.data, 0);
-        if (server->response == nullptr) {
-            server->response = new response({buff,size});
-        } else {
-            server->response->add_part({buff, size});
-        }
-        write(get_client_sock(), {buff, size});
-    }
-}
-
-void proxy_server::tcp_connection::try_to_cache()
-{
-    if (server->response != nullptr && server->response->is_cacheable()) {
-        std::cout << "add to cache: " << server->host + server->URI  <<  " " << server->response->get_header("ETag") << "\n";
-        parent->cache.put(server->host + server->URI, server->response->get_text());
-    }
-}
+//void proxy_server::tcp_connection::try_to_cache()
+//{
+//    if (server->response != nullptr && server->response->is_cacheable()) {
+//        std::cout << "add to cache: " << server->host + server->URI  <<  " " << server->response->get_header("ETag") << "\n";
+//        parent->cache.put(server->host + server->URI, server->response->get_text());
+//    }
+//}
