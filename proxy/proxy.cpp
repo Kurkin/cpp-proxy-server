@@ -57,7 +57,7 @@ std::string proxy_server::proxy_tcp_connection::get_host() const noexcept
     return request->get_host();
 }
 
-void proxy_server::proxy_tcp_connection::set_client_addrinfo(addrinfo addr)
+void proxy_server::proxy_tcp_connection::set_client_addr(sockaddr addr)
 {
     client_addr = addr;
 }

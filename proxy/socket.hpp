@@ -32,7 +32,7 @@ struct client_socket
     client_socket(client_socket const& other) = delete;
     client_socket(client_socket&& other) noexcept;
     client_socket& operator=(client_socket&& rhs) noexcept;
-    client_socket(const struct addrinfo addrinfo); // for connect;
+    client_socket(const sockaddr addr); // for connect;
     client_socket(const server_socket& server); // for accept
     int getfd() const noexcept { return fd.getfd(); };
     

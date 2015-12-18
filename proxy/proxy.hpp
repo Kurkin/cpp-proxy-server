@@ -63,7 +63,7 @@ public:
 
     std::function<void()> resolver = [&](){
 
-        lru_cache<std::string, addrinfo> cache(1000);
+        lru_cache<std::string, sockaddr> cache(1000);
         while (true) {
             std::unique_lock<std::mutex> lk(queue_mutex);
             queue_cond.wait(lk, [&]{return queue_ready;});
@@ -97,7 +97,7 @@ public:
                 std::unique_lock<std::mutex> lk1(ans_mutex);
                 std::unique_lock<std::mutex> lk2(state);
                 if (!parse_ed->canceled) {
-                    parse_ed->connection->set_client_addrinfo(cache.get(name + port));
+                    parse_ed->connection->set_client_addr(cache.get(name + port));
                 } else {
                     delete parse_ed;
                     continue;
@@ -123,11 +123,14 @@ public:
                 continue;
             }
             
+            sockaddr resolved = *(res->ai_addr);
+            freeaddrinfo(res);
+            
             std::unique_lock<std::mutex> lk1(ans_mutex);
             std::unique_lock<std::mutex> lk2(state);
                 if (!parse_ed->canceled) {
-                    parse_ed->connection->set_client_addrinfo(*res);
-                    cache.put(name + port, *res);
+                    parse_ed->connection->set_client_addr(resolved);
+                    cache.put(name + port, resolved);
                 } else {
                     delete parse_ed;
                     continue;
@@ -324,7 +327,7 @@ private:
         ~proxy_tcp_connection();
         
         std::string get_host() const noexcept;
-        void set_client_addrinfo(addrinfo addr);
+        void set_client_addr(sockaddr addr);
         void connect_to_server();
         
         struct request* request = nullptr;
@@ -332,7 +335,7 @@ private:
         parse_state* state = nullptr;
         std::string host;
         std::string URI;
-        addrinfo client_addr;
+        sockaddr client_addr;
         timer_element timer;
     };
 

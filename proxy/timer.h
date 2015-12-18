@@ -46,7 +46,6 @@ struct timer_element
 private:
     timer* t;
     clock_t::time_point wakeup;
-    uint64_t wakeup_time_point;
     callback_t callback;
 
     friend struct timer;
