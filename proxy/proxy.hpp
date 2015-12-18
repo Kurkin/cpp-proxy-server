@@ -28,6 +28,11 @@
 #define BUFF_SIZE 1024
 #define USER_EVENT_IDENT 0x5c0276ef
 
+namespace
+{
+    constexpr const timer::clock_t::duration timeout = std::chrono::seconds(5);
+}
+
 struct proxy_server
 {
 
@@ -188,6 +193,7 @@ public:
                     connection->deregistrate(connection->server);
                     connection->server = client_socket();
                 } else {
+                    connection->timer.restart(connection->queue.get_timer(), timeout); // restart timer
                     char buff[event.data];
                     std::cout << "read from " << connection->get_server_socket() << "\n";
                     size_t size = recv(connection->get_server_socket(), buff, event.data, 0);
@@ -205,6 +211,7 @@ public:
                     queue.delete_event_handler(event.ident, EVFILT_WRITE);
                     return;
                 }
+                connection->timer.restart(connection->queue.get_timer(), timeout); // restart timer
                 write_part part = connection->server.msg_queue.front();
                 connection->server.msg_queue.pop_front();
                 std::cout << "write to " << event.ident << "\n";
@@ -326,6 +333,7 @@ private:
         std::string host;
         std::string URI;
         addrinfo client_addr;
+        timer_element timer;
     };
 
 //        void make_request();

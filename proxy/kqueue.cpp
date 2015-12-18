@@ -124,5 +124,5 @@ int io_queue::run_timers_calculate_timeout()
     if (timer.empty())
         return -1;
     
-    return std::chrono::duration_cast<std::chrono::milliseconds>(timer.top() - now).count();
+    return std::chrono::duration_cast<std::chrono::seconds>(timer.top() - now).count();
 }

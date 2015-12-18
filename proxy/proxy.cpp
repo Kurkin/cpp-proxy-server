@@ -35,9 +35,15 @@ proxy_server::~proxy_server()
 }
 
 proxy_server::proxy_tcp_connection::proxy_tcp_connection(io_queue& queue, tcp_client&& client)
-    : tcp_connection(queue, std::move(client)) {}
+    : tcp_connection(queue, std::move(client))
+    , timer(this->queue.get_timer(), timeout, [this]() {
+        std::cout << "timeout for " << get_client_socket() << "\n";
+        delete this;
+    })
+{}
 
-proxy_server::proxy_tcp_connection::~proxy_tcp_connection() {
+proxy_server::proxy_tcp_connection::~proxy_tcp_connection()
+{
     if (request)
         delete request;
     if (response)
@@ -51,7 +57,8 @@ std::string proxy_server::proxy_tcp_connection::get_host() const noexcept
     return request->get_host();
 }
 
-void proxy_server::proxy_tcp_connection::set_client_addrinfo(addrinfo addr) {
+void proxy_server::proxy_tcp_connection::set_client_addrinfo(addrinfo addr)
+{
     client_addr = addr;
 }
 
