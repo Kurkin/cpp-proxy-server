@@ -23,6 +23,7 @@
 #include "utils.hpp"
 #include "new_http_handler.hpp"
 #include "throw_error.h"
+#include "socket.hpp"
 
 #define BUFF_SIZE 1024
 #define USER_EVENT_IDENT 0x5c0276ef
@@ -42,7 +43,7 @@ private:
 
     std::mutex state;
 
-    server_socket* server;
+    server_socket server;
 
     io_queue& queue;
 
@@ -169,7 +170,7 @@ public:
     };
 
     funct_t connect_client_f = [this](struct kevent event) {
-        tcp_connection* connection = new tcp_connection(new client_socket(server), this);
+        tcp_connection* connection = new tcp_connection(client_socket(server), this);
         std::cout << "client connected: " << connection->get_client_sock() << "\n";
         queue.add_event_handler(connection->get_client_sock(), EVFILT_READ, [connection](struct kevent event){
             connection->client_handler(event);
@@ -200,7 +201,8 @@ private:
         struct tcp_server;
         tcp_client* client = nullptr;
         tcp_server* server = nullptr;
-        proxy_server* parent;
+        proxy_server*
+        parent;
         std::deque<write_part> msg_to_server;
         std::deque<write_part> msg_to_client;
 
@@ -243,8 +245,8 @@ private:
         }
         
     public:
-        tcp_connection(client_socket* client, proxy_server* parent) : client(new tcp_client(client)), parent(parent) {};
-        ~tcp_connection() { std::cout << "tcp_connect deleted\n"; }
+        tcp_connection(client_socket&& client, proxy_server* parent) : client(new tcp_client(client)), parent(parent) {};
+        ~tcp_connection();
         int get_client_sock() const { return client->get_socket(); }
         int get_server_sock() const { return server->get_socket(); }
         std::string get_host() const { return client->request->get_host(); }
@@ -262,33 +264,33 @@ private:
         void read_request(struct kevent event);
 
         struct tcp_client {
-            tcp_client(client_socket* client) : socket(client) {};
+            tcp_client(client_socket& socket) : socket(std::move(socket)) {};
             ~tcp_client()
             {
-                std::cout << socket->get_socket() << " client deleted\n";
-                delete socket;
-                delete request;
+                std::cout << get_socket() << " client deleted\n";
+                if (request)
+                    delete request;
             };
 
-            int get_socket() const { return socket->get_socket(); }
+            int get_socket() const { return socket.getfd(); }
             
-            client_socket* socket;
+            client_socket socket;
             struct request* request = nullptr;
             struct addrinfo addrinfo;
         };
 
         struct tcp_server
         {
-            tcp_server(client_socket* socket) : socket(socket) {}
-            ~tcp_server()
-            {
-                std::cout << socket->get_socket() << " server deleted\n";
-                delete socket;
+            tcp_server(client_socket&& socket) : socket(std::move(socket)) {}
+            ~tcp_server() {
+                std::cout << get_socket() << " server deleted\n";
+                if (response)
+                    delete response;
             }
+            
+            int get_socket() const noexcept { return socket.getfd(); }
 
-            int get_socket() const { return socket->get_socket(); }
-
-            client_socket* socket;
+            client_socket socket;
             struct addrinfo addrinfo;
             struct response* response = nullptr;
             std::string host;

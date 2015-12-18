@@ -20,37 +20,40 @@ void proxy_server::resolve(parse_state* state)
     queue_cond.notify_one();
 }
 
-proxy_server::proxy_server(io_queue& queue, int port): queue(queue), cache(10000)
+proxy_server::proxy_server(io_queue& queue, int port): queue(queue), cache(10000), server(server_socket(port))
 {
-    server = new server_socket(port);
-    server->bind_and_listen();
+    server.bind_and_listen();
     
-    queue.add_event_handler(server->get_socket(), EVFILT_READ, connect_client_f);
+    queue.add_event_handler(server.getfd(), EVFILT_READ, connect_client_f);
     queue.add_event_handler(USER_EVENT_IDENT, EVFILT_USER, EV_CLEAR, host_resolfed_f);
 }
 
 proxy_server::~proxy_server()
 {
-    queue.delete_event_handler(server->get_socket(), EVFILT_READ);
+    queue.delete_event_handler(server.getfd(), EVFILT_READ);
     queue.delete_event_handler(USER_EVENT_IDENT, EVFILT_USER);
-    delete server;
+}
+
+proxy_server::tcp_connection::~tcp_connection()
+{
+    std::unique_lock<std::mutex> lk(parent->state);
+    if (state)
+        state->canceled = true;
+    lk.unlock();
+    parent->queue.delete_event_handler(get_client_sock(), EVFILT_READ);
+    parent->queue.delete_event_handler(get_client_sock(), EVFILT_WRITE);
+    delete client;
+    if (server) {
+        parent->queue.delete_event_handler(get_server_sock(), EVFILT_READ);
+        parent->queue.delete_event_handler(get_server_sock(), EVFILT_WRITE);
+        delete server;
+    }
 }
 
 void proxy_server::tcp_connection::client_handler(struct kevent event)
 {
     if (event.flags & EV_EOF) {
         std::cout << "EV_EOF from " << event.ident << " client\n";
-        std::unique_lock<std::mutex> lk(parent->state);
-        if (state) state->canceled = true;
-        lk.unlock();
-        parent->queue.delete_event_handler(get_client_sock(), EVFILT_READ);
-        parent->queue.delete_event_handler(get_client_sock(), EVFILT_WRITE);
-        delete client;
-        if (server) {
-            parent->queue.delete_event_handler(get_server_sock(), EVFILT_READ);
-            parent->queue.delete_event_handler(get_server_sock(), EVFILT_WRITE);
-            delete server;
-        }
         delete this;
     } else {
         read_request(event);
@@ -90,6 +93,7 @@ void proxy_server::tcp_connection::read_request(struct kevent event)
     }
 }
 
+
 void proxy_server::tcp_connection::connect_to_server()
 {
     if (server) {
@@ -112,7 +116,7 @@ void proxy_server::tcp_connection::connect_to_server()
         }
     }
     
-    server = new tcp_server(new client_socket(client->addrinfo));
+    server = new tcp_server(client_socket(client->addrinfo));
     server->host = client->request->get_host();
     server->URI = client->request->get_URI();
 }

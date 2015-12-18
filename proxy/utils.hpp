@@ -12,33 +12,9 @@
 #include <unordered_map>
 #include <list>
 
-struct server_socket {
-    server_socket(int port);
-    ~server_socket() { close(socket); };
-    
-    int get_socket() const { return socket; };
-    void bind_and_listen();
-    
-private:
-    int socket;
-    int port;
-};
-
-struct client_socket {
-    
-    client_socket(struct addrinfo addrinfo); // for connect;
-    client_socket(server_socket* server); // for accept
-    ~client_socket() { close(socket); };
-    
-    int get_socket() const { return socket; };
-    
-private:
-    int socket;
-};
-
 template<typename key_t, typename val_t>
-struct lru_cache {
-    
+struct lru_cache
+{
     typedef typename std::pair<key_t, val_t> pair;
     typedef typename std::list<pair>::iterator iterator;
     
