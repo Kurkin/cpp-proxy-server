@@ -30,7 +30,7 @@
 
 namespace
 {
-    constexpr const timer::clock_t::duration timeout = std::chrono::seconds(5);
+    constexpr const timer::clock_t::duration timeout = std::chrono::seconds(20);
 }
 
 struct proxy_server
@@ -39,20 +39,20 @@ struct proxy_server
 private:
     struct proxy_tcp_connection;
     struct parse_state;
+    
+    std::map<proxy_tcp_connection*, std::unique_ptr<proxy_tcp_connection>> connections;
+
     std::list<parse_state*> host_names;
     std::mutex queue_mutex;
     std::condition_variable queue_cond;
     bool queue_ready;
-
     std::mutex ans_mutex;
     std::list<parse_state*> ans;
-
     std::mutex state;
 
     server_socket server;
-
     io_queue& queue;
-
+    
     lru_cache<std::string, std::string> cache; // todo: <uri, cache ans>, cache ans should be a struct
 
 public:
@@ -179,12 +179,15 @@ public:
     };
     
     funct_t connect_client = [this](struct kevent event) {
-        proxy_tcp_connection* connection = new proxy_tcp_connection(*this, queue, tcp_client(client_socket(server)));
-        connection->set_client_on_read_write(
-            [connection](struct kevent event)
-            { connection->client_on_read(event); },
-            [connection](struct kevent event)
-            { connection->client_on_write(event); });
+        std::unique_ptr<proxy_tcp_connection> cc(new proxy_tcp_connection(*this, queue, tcp_client(client_socket(server))));
+        proxy_tcp_connection* pcc = cc.get();
+        connections.emplace(pcc, std::move(cc));
+        
+        pcc->set_client_on_read_write(
+            [pcc](struct kevent event)
+            { pcc->client_on_read(event); },
+            [pcc](struct kevent event)
+            { pcc->client_on_write(event); });
     };
     
 private:

@@ -1,4 +1,4 @@
-cmake_minimum_required(VERSION 3.3)
+cmake_minimum_required(VERSION 2.8)
 project(proxy)
 
 set(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} -std=c++11")
@@ -13,8 +13,14 @@ set(SOURCE_FILES
         "proxy/proxy.hpp"
         "proxy/throw_error.cpp"
         "proxy/throw_error.h"
-        "proxy/utils.cpp"
-        "proxy/utils.hpp")
+        "proxy/socket.cpp"
+        "proxy/socket.hpp"
+        "proxy/utils.hpp"
+        "proxy/file_descriptor.cpp"
+        "proxy/file_descriptor.h"
+        "proxy/timer.cpp"
+        "proxy/timer.h"
+)
 
 add_executable(proxy_serv ${SOURCE_FILES})
 

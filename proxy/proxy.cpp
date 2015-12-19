@@ -65,9 +65,9 @@ proxy_server::~proxy_server()
 
 proxy_server::proxy_tcp_connection::proxy_tcp_connection(proxy_server& proxy, io_queue& queue, tcp_client&& client)
     : tcp_connection(queue, std::move(client))
-    , timer(this->queue.get_timer(), timeout, [this]() {
+    , timer(this->queue.get_timer(), timeout, [this, &proxy]() {
         std::cout << "timeout for " << get_client_socket() << "\n";
-        delete this;
+        proxy.connections.erase(this);
     })
     , proxy(proxy)
 {}
@@ -79,7 +79,7 @@ proxy_server::proxy_tcp_connection::~proxy_tcp_connection()
     if (response)
         delete response;
     if (state)
-        delete state;
+        state->canceled = true;
 }
 
 std::string proxy_server::proxy_tcp_connection::get_host() const noexcept
@@ -124,7 +124,7 @@ void proxy_server::proxy_tcp_connection::client_on_read(struct kevent event)
     if (event.flags & EV_EOF)
     {
         std::cout << "EV_EOF from " << event.ident << " client\n";
-        delete this;
+        proxy.connections.erase(this);
     } else
     {
         timer.restart(queue.get_timer(), timeout);
@@ -147,7 +147,7 @@ void proxy_server::proxy_tcp_connection::client_on_read(struct kevent event)
 //                    todo: non block write
 //                        std::cout << "Bad Request\n";
 //                        write(get_client_sock(), "HTTP/1.1 400 Bad Request\r\n\r\n");
-            delete this;
+            proxy.connections.erase(this);
             return;
         }
         if (request->get_state() == FULL_BODY)
