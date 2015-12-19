@@ -169,76 +169,9 @@ public:
         delete parse_ed;
 
         std::cout << "host resolved \n";
+        connection->connect_to_server();
+        connection->make_request();
         
-        if (connection->get_server_socket() != -1) {
-            if (connection->request->get_host() == connection->host)
-            {
-                std::cout << "keep-alive is working!\n";
-                //            try_to_cache();
-                delete connection->response;
-                connection->response = nullptr;
-                connection->URI = connection->request->get_URI();
-            } else {
-                connection->deregistrate(connection->server);
-            }
-        }
-        
-        connection->server = tcp_client(client_socket(connection->client_addr));
-        connection->host = connection->request->get_host();
-        connection->URI = connection->request->get_URI();
-        
-        connection->set_server_on_read_write(
-            [connection](struct kevent event)
-            {
-                if (event.flags & EV_EOF && event.data == 0) {  // TODO: check for errors!
-                    std::cout << "EV_EOF from " << event.ident << " server\n";
-//                    try_to_cache();
-                    connection->deregistrate(connection->server);
-                    connection->server = client_socket();
-                } else {
-                    connection->timer.restart(connection->queue.get_timer(), timeout); // restart timer
-                    char buff[event.data];
-                    std::cout << "read from " << connection->get_server_socket() << "\n";
-                    size_t size = recv(connection->get_server_socket(), buff, event.data, 0);
-                    if (connection->response == nullptr) {
-                        connection->response = new response({buff,size});
-                    } else {
-                        connection->response->add_part({buff, size});
-                    }
-                    connection->write_to_client({buff, size});
-                }
-            },
-            [connection, this](struct kevent event)
-            {
-                if (connection->server.msg_queue.empty()) {
-                    queue.delete_event_handler(event.ident, EVFILT_WRITE);
-                    return;
-                }
-                connection->timer.restart(connection->queue.get_timer(), timeout); // restart timer
-                write_part part = connection->server.msg_queue.front();
-                connection->server.msg_queue.pop_front();
-                std::cout << "write to " << event.ident << "\n";
-                size_t writted = ::write(event.ident, part.get_part_text(), part.get_part_size());
-                if (writted == -1) {
-                    if (errno != EPIPE) {
-                        throw_error(errno, "write()");
-                    } else {
-                        if (part.get_part_size() != 0) {
-                            connection->server.msg_queue.push_front(part);
-                        }
-                    }
-                } else {
-                    part.writted += writted;
-                    if (part.get_part_size() != 0) {
-                        connection->server.msg_queue.push_front(part);
-                    }
-                }
-            });
-        
-        connection->write_to_server(connection->request->get_request_text());
-        delete connection->request;
-        connection->request = nullptr;
-
         std::unique_lock<std::mutex> lk(ans_mutex);
         if (ans.size() != 0) {
             queue.trigger_user_event_handler(USER_EVENT_IDENT);
@@ -246,73 +179,14 @@ public:
     };
     
     funct_t connect_client = [this](struct kevent event) {
-        proxy_tcp_connection* connection = new proxy_tcp_connection(queue, tcp_client(client_socket(server)));
+        proxy_tcp_connection* connection = new proxy_tcp_connection(*this, queue, tcp_client(client_socket(server)));
         connection->set_client_on_read_write(
-            [connection, this](struct kevent event)
-            {
-                if (event.flags & EV_EOF)
-                {
-                    std::cout << "EV_EOF from " << event.ident << " client\n";
-                    delete connection;
-                } else
-                {
-                    char buff[event.data];
-                    
-                    std::cout << "read request of " << event.ident << "\n";
-
-                    size_t size = read(connection->get_client_socket() , buff, event.data);
-                    if (size == static_cast<size_t>(-1)) {
-                        throw_error(errno, "read()");
-                    }
-                    if (connection->request == nullptr) {
-                        connection->request = new request({buff, size});
-                    } else {
-                        connection->request->add_part({buff, size});
-                    }
-                    if (connection->request->get_state() == BAD) {
-//                    todo: non block write
-//                        std::cout << "Bad Request\n";
-//                        write(get_client_sock(), "HTTP/1.1 400 Bad Request\r\n\r\n");
-                        delete connection;
-                        return;
-                    }
-                    if (connection->request->get_state() == FULL_BODY) {
-                        std::cout << "push to resolve " << connection->get_host() << connection->request->get_URI() << "\n";
-                        if (connection->state) delete connection->state;
-                        connection->state = new parse_state(connection);
-                        resolve(connection->state);
-                    }
-                }
-            },
-            [connection, this](struct kevent event)
-            {
-                if (connection->client.msg_queue.empty()) {
-                    queue.delete_event_handler(event.ident, EVFILT_WRITE);
-                    return;
-                }
-                write_part part = connection->client.msg_queue.front();
-                connection->client.msg_queue.pop_front();
-                std::cout << "write to " << event.ident << "\n";
-                size_t writted = ::write(event.ident, part.get_part_text(), part.get_part_size());
-                if (writted == -1) {
-                    if (errno != EPIPE) {
-                        throw_error(errno, "write()");
-                    } else {
-                        if (part.get_part_size() != 0) {
-                            connection->client.msg_queue.push_front(part);
-                        }
-                    }
-                } else {
-                    part.writted += writted;
-                    if (part.get_part_size() != 0) {
-                        connection->client.msg_queue.push_front(part);
-                    }
-                }
-            });
+            [connection](struct kevent event)
+            { connection->client_on_read(event); },
+            [connection](struct kevent event)
+            { connection->client_on_write(event); });
     };
     
-    
-
 private:
     struct parse_state
     {
@@ -323,12 +197,18 @@ private:
     
     struct proxy_tcp_connection : tcp_connection
     {
-        proxy_tcp_connection(io_queue& queue, tcp_client&& client);
+        proxy_tcp_connection(proxy_server& proxy, io_queue& queue, tcp_client&& client);
         ~proxy_tcp_connection();
         
         std::string get_host() const noexcept;
         void set_client_addr(sockaddr addr);
         void connect_to_server();
+        void client_on_write(struct kevent event);
+        void client_on_read(struct kevent event);
+        void server_on_write(struct kevent event);
+        void server_on_read(struct kevent event);
+        void make_request();
+        void try_to_cache();
         
         struct request* request = nullptr;
         struct response* response = nullptr;
@@ -337,11 +217,8 @@ private:
         std::string URI;
         sockaddr client_addr;
         timer_element timer;
+        proxy_server& proxy;
     };
-
-//        void make_request();
-//        void try_to_cache();
-
 };
 
 #endif /* proxy_hpp */
