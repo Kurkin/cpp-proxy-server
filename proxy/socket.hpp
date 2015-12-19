@@ -45,6 +45,7 @@ struct write_part {
     size_t writted = 0;
     
     write_part(std::string text) : text(text) {};
+    write_part(std::string text, size_t written) : text(text), writted(written) {};
     const char* get_part_text() const { return text.data() + writted; };
     size_t get_part_size() const { return text.size() - writted; }
 };

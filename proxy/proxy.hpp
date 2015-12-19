@@ -18,6 +18,7 @@
 #include <netdb.h>
 #include <deque>
 #include <arpa/inet.h>
+#include <thread>
 
 #include "kqueue.hpp"
 #include "utils.hpp"
@@ -28,10 +29,6 @@
 #define BUFF_SIZE 1024
 #define USER_EVENT_IDENT 0x5c0276ef
 
-namespace
-{
-    constexpr const timer::clock_t::duration timeout = std::chrono::seconds(20);
-}
 
 struct proxy_server
 {
@@ -42,37 +39,35 @@ private:
     
     std::map<proxy_tcp_connection*, std::unique_ptr<proxy_tcp_connection>> connections;
 
-    std::list<parse_state*> host_names;
-    std::mutex queue_mutex;
+    std::list<std::unique_ptr<parse_state>> host_names;
+    std::list<std::unique_ptr<parse_state>> ans;
     std::condition_variable queue_cond;
-    bool queue_ready;
+    std::mutex queue_mutex;
     std::mutex ans_mutex;
-    std::list<parse_state*> ans;
     std::mutex state;
-
+    std::mutex cache_mutex;
+    std::thread dns_resolver1;
+    std::thread dns_resolver2;
+    
     server_socket server;
     io_queue& queue;
     
     lru_cache<std::string, std::string> cache; // todo: <uri, cache ans>, cache ans should be a struct
-
+    lru_cache<std::string, sockaddr> addr_cache;
+    
 public:
     proxy_server(io_queue& queue, int port);
     ~proxy_server();
 
-    void resolve(parse_state* connection);
+    void resolve(std::unique_ptr<parse_state>&& connection);
 
     std::function<void()> resolver = [&](){
-
-        lru_cache<std::string, sockaddr> cache(1000);
         while (true) {
             std::unique_lock<std::mutex> lk(queue_mutex);
-            queue_cond.wait(lk, [&]{return queue_ready;});
+            queue_cond.wait(lk, [&]{return !host_names.empty();});
 
-            parse_state* parse_ed = host_names.front();
+            auto parse_ed = std::move(host_names.front());
             host_names.pop_front();
-            if (host_names.size() == 0) {
-                queue_ready = false;
-            }
             lk.unlock();
 
             std::string name;
@@ -81,7 +76,7 @@ public:
                 if (!parse_ed->canceled) {
                     name = parse_ed->connection->get_host();
                 } else {
-                    delete parse_ed;
+                    parse_ed.release();
                     continue;
                 }
             }
@@ -93,22 +88,26 @@ public:
                 name = name.erase(port_str);
             }
             
-            if (cache.contain(name + port)) {
-                std::unique_lock<std::mutex> lk1(ans_mutex);
-                std::unique_lock<std::mutex> lk2(state);
-                if (!parse_ed->canceled) {
-                    parse_ed->connection->set_client_addr(cache.get(name + port));
-                } else {
-                    delete parse_ed;
+            {
+                std::unique_lock<std::mutex> lk3(cache_mutex);
+                if (cache.contain(name + port)) {
+                    std::unique_lock<std::mutex> lk1(ans_mutex);
+                    std::unique_lock<std::mutex> lk2(state);
+                    if (!parse_ed->canceled) {
+                        parse_ed->connection->set_client_addr(addr_cache.get(name + port));
+                    } else {
+                        parse_ed.release();
+                        continue;
+                    }
+                    ans.push_back(std::move(parse_ed));
+                    queue.trigger_user_event_handler(USER_EVENT_IDENT);
+                    lk2.unlock();
+                    lk1.unlock();
                     continue;
                 }
-                ans.push_back(parse_ed);
-                queue.trigger_user_event_handler(USER_EVENT_IDENT);
-                lk2.unlock();
-                lk1.unlock();
-                continue;
+    
             }
-
+            
             struct addrinfo hints, *res;
 
             memset(&hints, 0, sizeof(hints));
@@ -128,15 +127,17 @@ public:
             
             std::unique_lock<std::mutex> lk1(ans_mutex);
             std::unique_lock<std::mutex> lk2(state);
+            std::unique_lock<std::mutex> lk3(cache_mutex);
                 if (!parse_ed->canceled) {
                     parse_ed->connection->set_client_addr(resolved);
-                    cache.put(name + port, resolved);
+                    addr_cache.put(name + port, resolved);
                 } else {
-                    delete parse_ed;
+                    parse_ed.release();
                     continue;
                 }
-                ans.push_back(parse_ed);
+            ans.push_back(std::move(parse_ed));
                 queue.trigger_user_event_handler(USER_EVENT_IDENT);
+            lk3.unlock();
             lk2.unlock();
             lk1.unlock();
 
@@ -146,27 +147,27 @@ public:
 
     funct_t host_resolfed = [&](struct kevent event)
     {
-        parse_state* parse_ed;
+        std::unique_ptr<parse_state> parse_ed;
         {
             std::unique_lock<std::mutex> lk(ans_mutex);
             if (ans.size() == 0) {
                 return;
             }
-            parse_ed = ans.front();
+            parse_ed = std::move(ans.front());
             ans.pop_front();
         }
 
         {
             std::unique_lock<std::mutex> lk(state);
             if (parse_ed->canceled) {
-                delete parse_ed;
+                parse_ed.release();
                 return;
             }
         }
 
         proxy_tcp_connection* connection = parse_ed -> connection;
         connection -> state = nullptr;
-        delete parse_ed;
+        parse_ed.release();
 
         std::cout << "host resolved \n";
         connection->connect_to_server();
@@ -213,14 +214,15 @@ private:
         void make_request();
         void try_to_cache();
         
-        struct request* request = nullptr;
-        struct response* response = nullptr;
-        parse_state* state = nullptr;
+        std::unique_ptr<response> response;
+        std::unique_ptr<request> request;
+        parse_state* state;
         std::string host;
         std::string URI;
         sockaddr client_addr;
         timer_element timer;
         proxy_server& proxy;
+        bool revalidate = false;
     };
 };
 

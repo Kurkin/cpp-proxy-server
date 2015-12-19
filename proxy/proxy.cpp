@@ -39,19 +39,23 @@ namespace
             }
         }
     }
+    
+    constexpr const timer::clock_t::duration timeout = std::chrono::seconds(20);
 }
 
-void proxy_server::resolve(parse_state* state)
+void proxy_server::resolve(std::unique_ptr<parse_state>&& state)
 {
     std::lock_guard<std::mutex> lk(queue_mutex);
-    host_names.push_back(state);
-    queue_ready = true;
+    host_names.push_back(std::move(state));
     queue_cond.notify_one();
 }
 
-proxy_server::proxy_server(io_queue& queue, int port): server(server_socket(port)), queue(queue), cache(10000)
+proxy_server::proxy_server(io_queue& queue, int port): server(server_socket(port)), queue(queue), cache(10000), addr_cache(10000)
 {
     server.bind_and_listen();
+
+    dns_resolver1 = std::thread(resolver);
+    dns_resolver2 = std::thread(resolver);
     
     queue.add_event_handler(server.getfd(), EVFILT_READ, connect_client);
     queue.add_event_handler(USER_EVENT_IDENT, EVFILT_USER, EV_CLEAR, host_resolfed);
@@ -74,10 +78,6 @@ proxy_server::proxy_tcp_connection::proxy_tcp_connection(proxy_server& proxy, io
 
 proxy_server::proxy_tcp_connection::~proxy_tcp_connection()
 {
-    if (request)
-        delete request;
-    if (response)
-        delete response;
     if (state)
         state->canceled = true;
 }
@@ -99,7 +99,7 @@ void proxy_server::proxy_tcp_connection::connect_to_server()
         {
             std::cout << "keep-alive is working!\n";
             try_to_cache();
-            delete response;
+            response.release();
             response = nullptr;
             URI = request->get_URI();
             return;
@@ -139,7 +139,7 @@ void proxy_server::proxy_tcp_connection::client_on_read(struct kevent event)
         if (request) {
             request->add_part({buff, size});
         } else {
-            request = new struct request({buff, size});
+            request.reset(new struct request({buff, size}));
         }
         
         if (request->get_state() == BAD)
@@ -152,10 +152,15 @@ void proxy_server::proxy_tcp_connection::client_on_read(struct kevent event)
         }
         if (request->get_state() == FULL_BODY)
         {
-            std::cout << "push to resolve " << get_host() << request->get_URI() << "\n";
-            if (state) delete state;
-            state = new parse_state(this);
-            proxy.resolve(state);
+//            std::unique_lock<std::mutex> lk1(proxy.cache_mutex);
+//            if (proxy.addr_cache.contain(get_host())) {
+                std::cout << "push to resolve " << get_host() << request->get_URI() << "\n";
+                auto temp = std::unique_ptr<parse_state>(new parse_state(this));
+                state = temp.get();
+                proxy.resolve(std::move(temp));
+//            } else {
+//            
+//            }
         }
     }
 }
@@ -185,7 +190,7 @@ void proxy_server::proxy_tcp_connection::server_on_read(struct kevent event)
         std::cout << "read from " << get_server_socket() << "\n";
         size_t size = recv(get_server_socket(), buff, event.data, 0);
         if (response == nullptr) {
-            response = new struct response({buff,size});
+            response.reset(new struct response({buff,size}));
         } else {
             response->add_part({buff, size});
         }
@@ -199,15 +204,14 @@ void proxy_server::proxy_tcp_connection::make_request()
         std::cout << "cache is working! for " << get_client_socket() << "\n"; // TODO: validate cache use if_match
         auto cache_response =  proxy.cache.get(request->get_host() + request->get_URI());
         write_to_client(cache_response);
-        delete request;
-        request = nullptr;
+        request.release();
         return;
     }
     
     std::cout << "tcp_pair: client: " << get_client_socket() << " server: " << get_server_socket() << "\n";
     
     write_to_server(request->get_request_text());
-    delete request;
+    request.release();
     request = nullptr;
 }
 

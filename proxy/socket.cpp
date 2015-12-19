@@ -144,15 +144,33 @@ void tcp_connection::set_server(tcp_client &&server)
 void tcp_connection::write_to_client(std::string text)
 {
     if (client.msg_queue.empty())
-        queue.add_event_handler(client.get_socket(), EVFILT_WRITE, client.on_write);
-    client.msg_queue.push_back(text);
+    {
+        size_t written = send(client.get_socket(), text.data(), text.size(), 0);
+        if (written == -1 && errno != ENOTCONN)
+            throw_error(errno, "send()");
+        if (written != text.size()) {
+            queue.add_event_handler(client.get_socket(), EVFILT_WRITE, client.on_write);
+            client.msg_queue.push_back({text, written == -1 ? 0 : written});
+        }
+    } else {
+        client.msg_queue.push_back({text, 0});
+    }
 }
 
 void tcp_connection::write_to_server(std::string text)
 {
-    if (server.msg_queue.empty() && server.get_socket() != -1)
-        queue.add_event_handler(server.get_socket(), EVFILT_WRITE, server.on_write);
-    server.msg_queue.push_back(text);
+    if (server.msg_queue.empty())
+    {
+        size_t written = send(server.get_socket(), text.data(), text.size(), 0);
+        if (written == -1 && errno != ENOTCONN)
+            throw_error(errno, "send()");
+        if (written != text.size()) {
+            queue.add_event_handler(server.get_socket(), EVFILT_WRITE, server.on_write);
+            server.msg_queue.push_back({text, written == -1 ? 0 : written});
+        }
+    } else {
+        server.msg_queue.push_back({text, 0});
+    }
 }
 
 int tcp_connection::get_client_socket() const noexcept
