@@ -26,13 +26,10 @@
 #include "throw_error.h"
 #include "socket.hpp"
 
-#define BUFF_SIZE 1024
 #define USER_EVENT_IDENT 0x5c0276ef
-
 
 struct proxy_server
 {
-
 private:
     struct proxy_tcp_connection;
     struct parse_state;

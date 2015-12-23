@@ -7,6 +7,7 @@
 //
 
 #include <assert.h>
+#include <sys/errno.h>
 
 #include "proxy.hpp"
 #include "throw_error.h"

@@ -11,7 +11,7 @@
 
 http::~http() {}
 
-void http::add_part(std::string part)
+void http::add_part(std::string&& part)
 {
     text.append(part);
     update_state();
@@ -53,7 +53,7 @@ void http::parse_headers()
     };
 }
 
-std::string http::get_header(std::string name) const
+std::string http::get_header(std::string&& name) const
 {
     if (headers.find(name) != headers.end()) {
         auto value = headers.at(name);
@@ -64,11 +64,11 @@ std::string http::get_header(std::string name) const
 
 void http::check_body()
 {
-    body = text.substr(body_start);
+    size_t length = text.size() - body_start;
     
     if (get_header("Content-Length") != "")
     {
-        if (body.size() == static_cast<size_t>(std::stoi(get_header("Content-Length")))) {
+        if (length == static_cast<size_t>(std::stoi(get_header("Content-Length")))) {
             state = FULL_BODY;
         } else {
             state = PARTICAL_BODY;
@@ -76,13 +76,13 @@ void http::check_body()
     }
     else if (get_header("Transfer-Encoding") == "chunked")
     {
-        if (std::string(body.end() - 7, body.end()) == "\r\n0\r\n\r\n") {
+        if (std::string(text.end() - 7, text.end()) == "\r\n0\r\n\r\n") {
             state = FULL_BODY;
         } else {
             state = PARTICAL_BODY;
         }
     }
-    else if (body.size() == 0)
+    else if (length == 0)
     {
         state = FULL_BODY;
     } else {
@@ -148,7 +148,7 @@ std::string request::get_request_text()
             headers.append(it.first + ": " + it.second + "\r\n"); // todo: drop hop-by-hop headers
     }
     headers += "\r\n";
-    return first_line + headers + body;
+    return first_line + headers + text.substr(body_start);
 }
 
 bool request::is_validating() const
