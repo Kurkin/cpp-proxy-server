@@ -146,7 +146,7 @@ void tcp_connection::write_to_client(std::string&& text)
     if (client.msg_queue.empty())
     {
         size_t written = send(client.get_socket(), text.data(), text.size(), 0);
-        if (written == -1 && errno != ENOTCONN)
+        if (written == -1 && errno != ENOTCONN && errno != EAGAIN)
             throw_error(errno, "send()");
         if (written != text.size()) {
             queue.add_event_handler(client.get_socket(), EVFILT_WRITE, client.on_write);
@@ -162,7 +162,7 @@ void tcp_connection::write_to_server(std::string&& text)
     if (server.msg_queue.empty())
     {
         size_t written = send(server.get_socket(), text.data(), text.size(), 0);
-        if (written == -1 && errno != ENOTCONN)
+        if (written == -1 && errno != ENOTCONN && errno != EAGAIN)
             throw_error(errno, "send()");
         if (written != text.size()) {
             queue.add_event_handler(server.get_socket(), EVFILT_WRITE, server.on_write);
