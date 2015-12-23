@@ -43,17 +43,16 @@ private:
     std::mutex ans_mutex;
     std::mutex state;
     std::mutex cache_mutex;
-    std::thread dns_resolver1;
-    std::thread dns_resolver2;
+    std::vector<std::thread> resolvers;
     
     server_socket server;
     io_queue& queue;
     
-    lru_cache<std::string, std::string> cache; // todo: <uri, cache ans>, cache ans should be a struct
+    lru_cache<std::string, response> cache; // todo: <uri, cache ans>, cache ans should be a struct
     lru_cache<std::string, sockaddr> addr_cache;
     
 public:
-    proxy_server(io_queue& queue, int port);
+    proxy_server(io_queue& queue, int port, size_t resolvers_num);
     ~proxy_server();
 
     void resolve(std::unique_ptr<parse_state>&& connection);
@@ -83,26 +82,6 @@ public:
                 size_t port_str = name.find(":");
                 port = name.substr(port_str + 1);
                 name = name.erase(port_str);
-            }
-            
-            {
-                std::unique_lock<std::mutex> lk3(cache_mutex);
-                if (cache.contain(name + port)) {
-                    std::unique_lock<std::mutex> lk1(ans_mutex);
-                    std::unique_lock<std::mutex> lk2(state);
-                    if (!parse_ed->canceled) {
-                        parse_ed->connection->set_client_addr(addr_cache.get(name + port));
-                    } else {
-                        parse_ed.release();
-                        continue;
-                    }
-                    ans.push_back(std::move(parse_ed));
-                    queue.trigger_user_event_handler(USER_EVENT_IDENT);
-                    lk2.unlock();
-                    lk1.unlock();
-                    continue;
-                }
-    
             }
             
             struct addrinfo hints, *res;
@@ -202,7 +181,8 @@ private:
         ~proxy_tcp_connection();
         
         std::string get_host() const noexcept;
-        void set_client_addr(sockaddr addr);
+        void set_client_addr(const sockaddr& addr);
+        void set_client_addr(const sockaddr&& addr);
         void connect_to_server();
         void client_on_write(struct kevent event);
         void client_on_read(struct kevent event);
@@ -213,7 +193,7 @@ private:
         
         std::unique_ptr<response> response;
         std::unique_ptr<request> request;
-        parse_state* state;
+        parse_state* state = nullptr;
         std::string host;
         std::string URI;
         sockaddr client_addr;

@@ -141,7 +141,7 @@ void tcp_connection::set_server(tcp_client &&server)
     registrate(server);
 }
 
-void tcp_connection::write_to_client(std::string text)
+void tcp_connection::write_to_client(std::string&& text)
 {
     if (client.msg_queue.empty())
     {
@@ -157,7 +157,7 @@ void tcp_connection::write_to_client(std::string text)
     }
 }
 
-void tcp_connection::write_to_server(std::string text)
+void tcp_connection::write_to_server(std::string&& text)
 {
     if (server.msg_queue.empty())
     {

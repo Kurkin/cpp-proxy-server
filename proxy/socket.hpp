@@ -77,8 +77,8 @@ struct tcp_connection
             deregistrate(server);
     };
     void set_server(tcp_client&& server);
-    void write_to_client(std::string text);
-    void write_to_server(std::string text);
+    void write_to_client(std::string&& text);
+    void write_to_server(std::string&& text);
     int get_client_socket() const noexcept;
     int get_server_socket() const noexcept;
     void set_client_on_read_write(on_ready_t on_read, on_ready_t on_write);

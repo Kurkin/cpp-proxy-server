@@ -168,6 +168,11 @@ bool response::is_cacheable() const
            && get_code() == "200";
 }
 
+request* response::get_validating_request(std::string URI, std::string host) const
+{
+    return new request{"GET " + URI + " HTTP/1.1\r\nIf-None-Match: " + get_header("ETag") + "\r\nHost: " + host + "\r\n\r\n"};
+}
+
 void response::parse_first_line()
 {
     auto first_space = std::find_if(text.begin(), text.end(), [](char a) { return a == ' '; });
