@@ -58,66 +58,6 @@ public:
 
     void resolve(std::unique_ptr<parse_state> connection);
 
-    funct_t host_resolfed = [&](struct kevent event)
-    {
-        std::unique_ptr<parse_state> parse_ed;
-        {
-            std::unique_lock<std::mutex> lk(ans_mutex);
-            if (ans.size() == 0) {
-                return;
-            }
-            parse_ed = std::move(ans.front());
-            ans.pop_front();
-        }
-
-        {
-            std::unique_lock<std::mutex> lk(state);
-            if (parse_ed->canceled) {
-                parse_ed.release();
-                return;
-            }
-        }
-
-        proxy_tcp_connection* connection = parse_ed -> connection;
-        connection -> state = nullptr;
-        parse_ed.release();
-
-        std::cout << "host resolved \n";
-        connection->connect_to_server();
-        if (connection->request->get_method() == "CONNECT" ) {
-            connection->write_to_client("HTTP/1.1 200 Connection established\r\n\r\n");
-            connection->set_client_on_read_write(
-                                          [connection](struct kevent event)
-                                          { connection->CONNECT_on_read(event); },
-                                          [connection](struct kevent event)
-                                          { connection->client_on_write(event); });
-            connection->set_server_on_read_write(
-                                          [connection](struct kevent event)
-                                          { connection->CONNECT_on_read(event); },
-                                          [connection](struct kevent event)
-                                          { connection->server_on_write(event); });
-        } else {
-            connection->make_request();
-        }
-
-        std::unique_lock<std::mutex> lk(ans_mutex);
-        if (ans.size() != 0) {
-            queue.trigger_user_event_handler(USER_EVENT_IDENT);
-        }
-    };
-    
-    funct_t connect_client = [this](struct kevent event) {
-        std::unique_ptr<proxy_tcp_connection> cc(new proxy_tcp_connection(*this, queue, tcp_client(client_socket(server))));
-        proxy_tcp_connection* pcc = cc.get();
-        connections.emplace(pcc, std::move(cc));
-        
-        pcc->set_client_on_read_write(
-            [pcc](struct kevent event)
-            { pcc->client_on_read(event); },
-            [pcc](struct kevent event)
-            { pcc->client_on_write(event); });
-    };
-    
 private:
     void resolver_thread_proc();
 
