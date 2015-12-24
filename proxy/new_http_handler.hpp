@@ -9,6 +9,7 @@
 #ifndef new_http_handler_hpp
 #define new_http_handler_hpp
 
+// TODO: enum?
 #define BAD -1
 #define FIRST_LINE 1 // first line get, headers not full
 #define FULL_HEADERS 2 // headers get and request host ready to resolve

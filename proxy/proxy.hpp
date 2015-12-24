@@ -27,7 +27,7 @@
 #include "throw_error.h"
 #include "socket.hpp"
 
-#define USER_EVENT_IDENT 0x5c0276ef
+uintptr_t const ident = 0x5c0276ef;
 
 struct proxy_server
 {
