@@ -178,6 +178,7 @@ void proxy_server::proxy_tcp_connection::client_on_read(struct kevent event)
             } else {
                 lk1.unlock();
                 std::cout << "push to resolve " << get_host() << request->get_URI() << "\n";
+                // TODO: can be replaced with std::make_unique
                 auto temp = std::unique_ptr<parse_state>(new parse_state(this));
                 state = temp.get();
                 proxy.resolve(std::move(temp));
