@@ -9,6 +9,7 @@
 #ifndef proxy_hpp
 #define proxy_hpp
 
+#include <memory>
 #include <list>
 #include <mutex>
 #include <condition_variable>

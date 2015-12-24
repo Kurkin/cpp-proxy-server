@@ -7,7 +7,7 @@
 //
 
 #include "new_http_handler.hpp"
-
+#include <algorithm>
 
 http::~http() {}
 
