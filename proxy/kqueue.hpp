@@ -31,7 +31,6 @@ struct io_queue {
     
     void watch_loop();
     void hard_stop(); //other
-    void soft_stop(); //sigterm
     
     timer& get_timer() noexcept;
     
