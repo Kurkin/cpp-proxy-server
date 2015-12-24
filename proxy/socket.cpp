@@ -108,12 +108,12 @@ tcp_client::tcp_client()
     , on_write(on_ready_t{})
     , socket(client_socket{}) {}
 
-tcp_client::tcp_client(client_socket&& socket)
+tcp_client::tcp_client(client_socket socket)
     : on_read(on_ready_t{})
     , on_write(on_ready_t{})
     , socket(std::move(socket)) {}
 
-tcp_client::tcp_client(client_socket&& socket, on_ready_t on_read, on_ready_t on_write)
+tcp_client::tcp_client(client_socket socket, on_ready_t on_read, on_ready_t on_write)
     : on_read(on_read)
     , on_write(on_write)
     , socket(std::move(socket)) {}
@@ -129,20 +129,20 @@ int tcp_client::get_socket() const noexcept
     return socket.getfd();
 }
 
-tcp_connection::tcp_connection(io_queue& queue, tcp_client&& client)
+tcp_connection::tcp_connection(io_queue& queue, tcp_client client)
     : queue(queue)
     , client(std::move(client))
 {
     registrate(this->client);
 }
 
-void tcp_connection::set_server(tcp_client &&server)
+void tcp_connection::set_server(tcp_client server)
 {
     this->server = std::move(server);
     registrate(server);
 }
 
-void tcp_connection::write_to_client(std::string&& text)
+void tcp_connection::write_to_client(std::string text)
 {
     if (client.msg_queue.empty())
     {
@@ -158,7 +158,7 @@ void tcp_connection::write_to_client(std::string&& text)
     }
 }
 
-void tcp_connection::write_to_server(std::string&& text)
+void tcp_connection::write_to_server(std::string text)
 {
     if (server.msg_queue.empty())
     {

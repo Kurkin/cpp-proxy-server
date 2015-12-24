@@ -17,7 +17,7 @@ int main()
         io_queue queue;
         proxy_server proxy(queue, 2540, 2);
         queue.watch_loop();
-    } catch (std::runtime_error error) {
+    } catch (std::runtime_error const& error) {
         std::cout << error.what() << "\n";
     }
 

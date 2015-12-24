@@ -55,8 +55,8 @@ struct tcp_client
     typedef std::function<void (struct kevent event)> on_ready_t;
     
     tcp_client();
-    tcp_client(client_socket&& socket);
-    tcp_client(client_socket&& socket, on_ready_t on_read, on_ready_t on_write);
+    tcp_client(client_socket socket);
+    tcp_client(client_socket socket, on_ready_t on_read, on_ready_t on_write);
     void set_on_read_write(on_ready_t on_read, on_ready_t on_write);
     int get_socket() const noexcept;
     
@@ -70,15 +70,15 @@ struct tcp_connection
 {
     typedef std::function<void (struct kevent event)> on_ready_t;
     
-    tcp_connection(io_queue& queue, tcp_client&& client);
+    tcp_connection(io_queue& queue, tcp_client client);
     ~tcp_connection() {
         deregistrate(client);
         if (get_server_socket() != -1)
             deregistrate(server);
     };
-    void set_server(tcp_client&& server);
-    void write_to_client(std::string&& text);
-    void write_to_server(std::string&& text);
+    void set_server(tcp_client server);
+    void write_to_client(std::string text);
+    void write_to_server(std::string text);
     int get_client_socket() const noexcept;
     int get_server_socket() const noexcept;
     void set_client_on_read_write(on_ready_t on_read, on_ready_t on_write);

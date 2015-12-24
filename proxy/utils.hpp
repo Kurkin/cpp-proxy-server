@@ -15,7 +15,7 @@
 template<typename key_t, typename val_t>
 struct lru_cache
 {
-    typedef typename std::pair<key_t, val_t> pair;
+    typedef std::pair<key_t, val_t> pair;
     typedef typename std::list<pair>::iterator iterator;
     
     lru_cache(size_t size) : max_size(size) {};

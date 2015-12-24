@@ -9,6 +9,7 @@
 #ifndef new_http_handler_hpp
 #define new_http_handler_hpp
 
+// TODO: enum?
 #define BAD -1
 #define FIRST_LINE 1 // first line get, headers not full
 #define FULL_HEADERS 2 // headers get and request host ready to resolve
@@ -17,15 +18,16 @@
 
 #include <iostream>
 #include <map>
+#include <string>
 
 struct http
 {
-    http(std::string&& text) : text(text) {}
+    http(std::string text) : text(std::move(text)) {}
     virtual ~http() = 0;
-    void add_part(std::string&&);
+    void add_part(std::string const&);
     
     int get_state() { return state; };
-    std::string get_header(std::string&&) const;
+    std::string const& get_header(std::string const&) const;
     std::string get_body() const { return text.substr(body_start); }
     std::string get_text() const { return text; }
     
@@ -43,7 +45,7 @@ protected:
 
 struct request : public http
 {
-    request(std::string&& text) : http(std::move(text)) { update_state(); };
+    request(std::string text) : http(std::move(text)) { update_state(); };
     
     std::string get_method() const { return method; }
     std::string get_URI();
@@ -63,7 +65,7 @@ private:
 
 struct response : public http
 {
-    response(std::string&& text) : http(std::move(text)) { update_state(); };
+    response(std::string text) : http(std::move(text)) { update_state(); };
     bool is_cacheable() const;
     std::string get_code() const { return code; }
     request* get_validating_request(std::string URI, std::string host) const;
