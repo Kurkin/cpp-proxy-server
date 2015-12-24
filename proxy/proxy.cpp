@@ -382,6 +382,8 @@ void proxy_server::proxy_tcp_connection::try_to_cache()
 
 void proxy_server::resolver_thread_proc()
 {
+    // TODO: when this thread is stopped?
+    //       probably destructor of proxy_server blocks indefinetely
     while (true) {
         std::unique_lock<std::mutex> lk(queue_mutex);
         queue_cond.wait(lk, [&]{return !host_names.empty();});
