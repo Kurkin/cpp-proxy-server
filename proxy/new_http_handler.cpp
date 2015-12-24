@@ -112,7 +112,7 @@ std::string request::get_host()
 
 void request::parse_first_line()
 {
-    auto first_space = std::find_if(text.begin(), text.end(), [](char a) { return a == ' '; });
+    auto first_space = std::find(text.begin(), text.end(), ' ');
     auto second_space = std::find_if(first_space + 1, text.end(), [](char a) { return a == ' '; });
     auto crlf = std::find_if(second_space + 1, text.end(), [](char a) { return a == '\r'; });
     
@@ -125,10 +125,6 @@ void request::parse_first_line()
     URI = {first_space + 1, second_space};
     http_version = {second_space + 1, crlf};
     
-    if (method != "POST" && method != "GET" && method != "CONNECT") {
-        state = BAD;
-        return;
-    }
     if (URI == "") {
         state = BAD;
         return;
@@ -139,15 +135,21 @@ void request::parse_first_line()
     }
 }
 
-std::string request::get_request_text()
+std::string request::get_request_text() const
 {
-    std::string first_line = method + " " + URI + " " + http_version + "\r\n";
-    std::string headers;
+    std::string first_line;
+    if (method == "CONNECT") {
+        first_line = method + " " + host + URI + " " + http_version + "\r\n";
+    } else {
+        first_line = method + " " + URI + " " + http_version + "\r\n";
+    }
+    std::string headers = "";
     for (auto it : this->headers) {
         if (it.first != "Proxy-Connection")
             headers.append(it.first + ": " + it.second + "\r\n"); // todo: drop hop-by-hop headers
     }
     headers += "\r\n";
+    
     return first_line + headers + text.substr(body_start);
 }
 

@@ -72,6 +72,7 @@ client_socket::client_socket(const sockaddr addr)
     }
     
     std::cout << "connecting to " << inet_ntoa(((sockaddr_in*) &addr)->sin_addr) << " on sock " << getfd() << "\n";
+    std::cout << "connecting to " << ntohs(((sockaddr_in*) &addr)->sin_port) << " on sock " << getfd() << "\n";
     if (connect(getfd(),  &addr, sizeof(addr)) < 0) {
         if (errno != EINPROGRESS) {
             throw_error(errno, "connect()");

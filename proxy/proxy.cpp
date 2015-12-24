@@ -29,7 +29,7 @@ namespace
                 throw_error(errno, "write()");
             } else {
                 if (part.get_part_size() != 0) {
-                    dest.msg_queue.push_front(part);
+                    dest.msg_queue.push_front(part); // no strong exception guarantee
                 }
             }
         } else {
@@ -39,11 +39,11 @@ namespace
             }
         }
     }
-    
-    constexpr const timer::clock_t::duration timeout = std::chrono::seconds(20);
+
+    constexpr const timer::clock_t::duration timeout = std::chrono::seconds(120);
 }
 
-void proxy_server::resolve(std::unique_ptr<parse_state>&& state)
+void proxy_server::resolve(std::unique_ptr<parse_state> state)
 {
     std::lock_guard<std::mutex> lk(queue_mutex);
     host_names.push_back(std::move(state));
@@ -143,6 +143,8 @@ void proxy_server::proxy_tcp_connection::client_on_read(struct kevent event)
             throw_error(errno, "read()");
         }
         
+        std::cout << "readed " << std::string{buff, size} << "\n";
+        
         if (request) {
             request->add_part({buff, size});
         } else {
@@ -166,7 +168,7 @@ void proxy_server::proxy_tcp_connection::client_on_read(struct kevent event)
                 host = host.erase(port_str);
             }
             std::unique_lock<std::mutex> lk1(proxy.cache_mutex);
-            if (proxy.addr_cache.contain(host + port)) {
+            if (proxy.addr_cache.contain(host + port) && request->get_method() != "CONNECT") {
                 std::cout << "dns cache is working!\n";
                 auto addr = proxy.addr_cache.get(host + port);
                 lk1.unlock();
@@ -207,12 +209,42 @@ void proxy_server::proxy_tcp_connection::server_on_read(struct kevent event)
         timer.restart(queue.get_timer(), timeout);
         char buff[event.data];
         size_t size = recv(get_server_socket(), buff, event.data, 0);
+        if (size == -1) {
+            if (errno == EAGAIN) {
+                return;
+            } else {
+                throw_error(errno, "recv()");
+            }
+        }
         if (response == nullptr) {
             response.reset(new struct response({buff,size}));
         } else {
             response->add_part({buff, size});
         }
         write_to_client({buff, size});
+    }
+}
+
+void proxy_server::proxy_tcp_connection::CONNECT_on_read(struct kevent event)
+{
+    if (event.flags & EV_EOF && event.data == 0) {
+        proxy.connections.erase(this);
+    } else {
+        timer.restart(queue.get_timer(), timeout);
+        char buff[event.data];
+        size_t size = recv(event.ident, buff, event.data, 0);
+        if (size == -1) {
+            if (errno == EAGAIN) {
+                return;
+            } else {
+                throw_error(errno, "recv()");
+            }
+        }
+        if (get_client_socket() == event.ident) {
+            write_to_server({buff, size});
+        } else {
+            write_to_client({buff, size});
+        }
     }
 }
 
@@ -274,6 +306,7 @@ void proxy_server::proxy_tcp_connection::make_request()
     
     std::cout << "tcp_pair: client: " << get_client_socket() << " server: " << get_server_socket() << "\n";
     
+    std::cout << request->get_request_text() << "\n";
     write_to_server(std::move(request->get_request_text()));
     request.release();
 }

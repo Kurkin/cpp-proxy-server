@@ -55,7 +55,7 @@ public:
     proxy_server(io_queue& queue, int port, size_t resolvers_num);
     ~proxy_server();
 
-    void resolve(std::unique_ptr<parse_state>&& connection);
+    void resolve(std::unique_ptr<parse_state> connection);
 
     std::function<void()> resolver = [&](){
         while (true) {
@@ -89,13 +89,26 @@ public:
             memset(&hints, 0, sizeof(hints));
             hints.ai_family = AF_INET;
             hints.ai_socktype = SOCK_STREAM;
-            hints.ai_flags = hints.ai_flags | AI_NUMERICSERV;
+            hints.ai_flags = AI_NUMERICSERV;
+            
+//            name = "https://" + name + "/";
             
             int error = getaddrinfo(name.c_str(), port.c_str(), &hints, &res);
             if (error) {
                 std::cout << name + ":" + port << "\n";
                 perror(gai_strerror(error));
                 continue;
+            }
+            
+            if (parse_ed->connection->request->get_method() == "CONNECT") {
+                freeaddrinfo(res);
+                hints.ai_flags = 0;
+                int error = getaddrinfo(name.c_str(), "https", &hints, &res);
+                if (error) {
+                    std::cout << name + ":" + port << "\n";
+                    perror(gai_strerror(error));
+                    continue;
+                }
             }
             
             sockaddr resolved = *(res->ai_addr);
@@ -147,8 +160,22 @@ public:
 
         std::cout << "host resolved \n";
         connection->connect_to_server();
-        connection->make_request();
-        
+        if (connection->request->get_method() == "CONNECT" ) {
+            connection->write_to_client("HTTP/1.1 200 Connection established\r\n\r\n");
+            connection->set_client_on_read_write(
+                                          [connection](struct kevent event)
+                                          { connection->CONNECT_on_read(event); },
+                                          [connection](struct kevent event)
+                                          { connection->client_on_write(event); });
+            connection->set_server_on_read_write(
+                                          [connection](struct kevent event)
+                                          { connection->CONNECT_on_read(event); },
+                                          [connection](struct kevent event)
+                                          { connection->server_on_write(event); });
+        } else {
+            connection->make_request();
+        }
+
         std::unique_lock<std::mutex> lk(ans_mutex);
         if (ans.size() != 0) {
             queue.trigger_user_event_handler(USER_EVENT_IDENT);
@@ -188,6 +215,7 @@ private:
         void client_on_read(struct kevent event);
         void server_on_write(struct kevent event);
         void server_on_read(struct kevent event);
+        void CONNECT_on_read(struct kevent event);
         void make_request();
         void try_to_cache();
         
