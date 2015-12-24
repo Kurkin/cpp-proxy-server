@@ -58,83 +58,6 @@ public:
 
     void resolve(std::unique_ptr<parse_state> connection);
 
-    std::function<void()> resolver = [&](){
-        while (true) {
-            std::unique_lock<std::mutex> lk(queue_mutex);
-            queue_cond.wait(lk, [&]{return !host_names.empty();});
-
-            auto parse_ed = std::move(host_names.front());
-            host_names.pop_front();
-            lk.unlock();
-
-            std::string name;
-            {
-                std::unique_lock<std::mutex> lk1(state);
-                if (!parse_ed->canceled) {
-                    name = parse_ed->connection->get_host();
-                } else {
-                    parse_ed.release();
-                    continue;
-                }
-            }
-
-            std::string port = "80";
-            if (name.find(":") != static_cast<size_t>(-1)) {
-                size_t port_str = name.find(":");
-                port = name.substr(port_str + 1);
-                name = name.erase(port_str);
-            }
-            
-            struct addrinfo hints, *res;
-
-            memset(&hints, 0, sizeof(hints));
-            hints.ai_family = AF_INET;
-            hints.ai_socktype = SOCK_STREAM;
-            hints.ai_flags = AI_NUMERICSERV;
-            
-//            name = "https://" + name + "/";
-            
-            int error = getaddrinfo(name.c_str(), port.c_str(), &hints, &res);
-            if (error) {
-                std::cout << name + ":" + port << "\n";
-                perror(gai_strerror(error));
-                continue;
-            }
-            
-            if (parse_ed->connection->request->get_method() == "CONNECT") {
-                freeaddrinfo(res);
-                hints.ai_flags = 0;
-                int error = getaddrinfo(name.c_str(), "https", &hints, &res);
-                if (error) {
-                    std::cout << name + ":" + port << "\n";
-                    perror(gai_strerror(error));
-                    continue;
-                }
-            }
-            
-            sockaddr resolved = *(res->ai_addr);
-            freeaddrinfo(res);
-            
-            std::unique_lock<std::mutex> lk1(ans_mutex);
-            std::unique_lock<std::mutex> lk2(state);
-            std::unique_lock<std::mutex> lk3(cache_mutex);
-                if (!parse_ed->canceled) {
-                    parse_ed->connection->set_client_addr(resolved);
-                    addr_cache.put(name + port, resolved);
-                } else {
-                    parse_ed.release();
-                    continue;
-                }
-            ans.push_back(std::move(parse_ed));
-                queue.trigger_user_event_handler(USER_EVENT_IDENT);
-            lk3.unlock();
-            lk2.unlock();
-            lk1.unlock();
-
-            queue_cond.notify_one();
-        }
-    };
-
     funct_t host_resolfed = [&](struct kevent event)
     {
         std::unique_ptr<parse_state> parse_ed;
@@ -196,6 +119,8 @@ public:
     };
     
 private:
+    void resolver_thread_proc();
+
     struct parse_state
     {
         parse_state(proxy_tcp_connection* connection) : connection(connection) {};
