@@ -205,7 +205,7 @@ private:
     
     struct proxy_tcp_connection : tcp_connection
     {
-        proxy_tcp_connection(proxy_server& proxy, io_queue& queue, tcp_client&& client);
+        proxy_tcp_connection(proxy_server& proxy, io_queue& queue, tcp_client client);
         ~proxy_tcp_connection();
         
         std::string get_host() const noexcept;

@@ -68,7 +68,7 @@ proxy_server::~proxy_server()
     queue.delete_event_handler(USER_EVENT_IDENT, EVFILT_USER);
 }
 
-proxy_server::proxy_tcp_connection::proxy_tcp_connection(proxy_server& proxy, io_queue& queue, tcp_client&& client)
+proxy_server::proxy_tcp_connection::proxy_tcp_connection(proxy_server& proxy, io_queue& queue, tcp_client client)
     : tcp_connection(queue, std::move(client))
     , timer(this->queue.get_timer(), timeout, [this, &proxy]() {
         std::cout << "timeout for " << get_client_socket() << "\n";
@@ -274,7 +274,7 @@ void proxy_server::proxy_tcp_connection::make_request()
                 if (response->get_state() >= FIRST_LINE) {
                     if (response->get_code() != "200") {
                         std::cout << "Not modified " << response->get_code() << "\n";
-                        write_to_client(std::move(cache_response.get_text()));
+                        write_to_client(cache_response.get_text());
                         set_server_on_read_write(
                                                  [this](struct kevent event)
                                                  {  if (event.flags & EV_EOF && event.data == 0) {
@@ -307,7 +307,7 @@ void proxy_server::proxy_tcp_connection::make_request()
     std::cout << "tcp_pair: client: " << get_client_socket() << " server: " << get_server_socket() << "\n";
     
     std::cout << request->get_request_text() << "\n";
-    write_to_server(std::move(request->get_request_text()));
+    write_to_server(request->get_request_text());
     request.release();
 }
 

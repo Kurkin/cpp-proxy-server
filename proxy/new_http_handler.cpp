@@ -11,7 +11,7 @@
 
 http::~http() {}
 
-void http::add_part(std::string&& part)
+void http::add_part(std::string const& part)
 {
     text.append(part);
     update_state();
@@ -53,7 +53,7 @@ void http::parse_headers()
     };
 }
 
-std::string http::get_header(std::string&& name) const
+std::string const& http::get_header(std::string const& name) const
 {
     if (headers.find(name) != headers.end()) {
         auto value = headers.at(name);
