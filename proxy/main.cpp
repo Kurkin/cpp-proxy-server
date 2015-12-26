@@ -10,12 +10,14 @@
 
 #include "kqueue.hpp"
 #include "proxy.hpp"
+#include "DNSresolver.hpp"
 
 int main()
 {
     try {
         io_queue queue;
-        proxy_server proxy(queue, 2540, 2);
+        DNSresolver resolver(2);
+        proxy_server proxy(queue, 2540, resolver);
         queue.watch_loop();
     } catch (std::runtime_error const& error) {
         std::cout << error.what() << "\n";

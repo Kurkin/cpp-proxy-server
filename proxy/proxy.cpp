@@ -43,69 +43,10 @@ namespace
     constexpr const timer::clock_t::duration timeout = std::chrono::seconds(120);
 }
 
-void proxy_server::resolve(std::unique_ptr<parse_state> state)
-{
-    std::lock_guard<std::mutex> lk(queue_mutex);
-    host_names.push_back(std::move(state));
-    queue_cond.notify_one();
-}
-
-proxy_server::proxy_server(io_queue& queue, int port, size_t resolvers_num): server(server_socket(port)), queue(queue), cache(10000), addr_cache(10000)
+proxy_server::proxy_server(io_queue& queue, int port, DNSresolver& resolver): server(server_socket(port)), queue(queue), resolver(resolver), cache(10000)
 {
     server.bind_and_listen();
 
-    for (size_t i = 0; i < resolvers_num; i++) {
-        resolvers.push_back(std::thread(&proxy_server::resolver_thread_proc, this));
-    }
-
-    funct_t host_resolfed = [this](struct kevent event)
-    {
-        std::unique_ptr<parse_state> parse_ed;
-        {
-            std::unique_lock<std::mutex> lk(ans_mutex);
-            if (ans.size() == 0) {
-                return;
-            }
-            parse_ed = std::move(ans.front());
-            ans.pop_front();
-        }
-
-        {
-            std::unique_lock<std::mutex> lk(state);
-            if (parse_ed->canceled) {
-                parse_ed.release();
-                return;
-            }
-        }
-
-        proxy_tcp_connection* connection = parse_ed -> connection;
-        connection -> state = nullptr;
-        parse_ed.release();
-
-        std::cout << "host resolved \n";
-        connection->connect_to_server();
-        if (connection->request->get_method() == "CONNECT" ) {
-            connection->write_to_client("HTTP/1.1 200 Connection established\r\n\r\n");
-            connection->set_client_on_read_write(
-                                          [connection](struct kevent event)
-                                          { connection->CONNECT_on_read(event); },
-                                          [connection](struct kevent event)
-                                          { connection->client_on_write(event); });
-            connection->set_server_on_read_write(
-                                          [connection](struct kevent event)
-                                          { connection->CONNECT_on_read(event); },
-                                          [connection](struct kevent event)
-                                          { connection->server_on_write(event); });
-        } else {
-            connection->make_request();
-        }
-
-        std::unique_lock<std::mutex> lk(ans_mutex);
-        if (ans.size() != 0) {
-            this->queue.trigger_user_event_handler(USER_EVENT_IDENT);
-        }
-    };
-    
     funct_t connect_client = [this](struct kevent event) {
         std::unique_ptr<proxy_tcp_connection> cc(new proxy_tcp_connection(*this, this->queue, tcp_client(client_socket(server))));
         proxy_tcp_connection* pcc = cc.get();
@@ -119,13 +60,11 @@ proxy_server::proxy_server(io_queue& queue, int port, size_t resolvers_num): ser
     };
 
     queue.add_event_handler(server.getfd(), EVFILT_READ, connect_client);
-    queue.add_event_handler(USER_EVENT_IDENT, EVFILT_USER, EV_CLEAR, host_resolfed);
 }
 
 proxy_server::~proxy_server()
 {
     queue.delete_event_handler(server.getfd(), EVFILT_READ);
-    queue.delete_event_handler(USER_EVENT_IDENT, EVFILT_USER);
 }
 
 proxy_server::proxy_tcp_connection::proxy_tcp_connection(proxy_server& proxy, io_queue& queue, tcp_client client)
@@ -135,12 +74,14 @@ proxy_server::proxy_tcp_connection::proxy_tcp_connection(proxy_server& proxy, io
         proxy.connections.erase(this);
     })
     , proxy(proxy)
-{}
+{
+    queue.add_event_handler(get_client_socket(), EVFILT_USER, EV_CLEAR, [this](struct kevent event)
+                            { on_resolver_hostname(event); });
+}
 
 proxy_server::proxy_tcp_connection::~proxy_tcp_connection()
 {
-    if (state)
-        state->canceled = true;
+    queue.delete_event_handler(get_client_socket(), EVFILT_USER);
 }
 
 std::string proxy_server::proxy_tcp_connection::get_host() const noexcept
@@ -202,9 +143,7 @@ void proxy_server::proxy_tcp_connection::client_on_read(struct kevent event)
         if (size == static_cast<size_t>(-1)) {
             throw_error(errno, "read()");
         }
-        
-        std::cout << "readed " << std::string{buff, size} << "\n";
-        
+    
         if (request) {
             request->add_part({buff, size});
         } else {
@@ -220,29 +159,12 @@ void proxy_server::proxy_tcp_connection::client_on_read(struct kevent event)
         
         if (request->get_state() == FULL_BODY)
         {
-            auto host = get_host();
-            std::string port = "80";
-            if (host.find(":") != static_cast<size_t>(-1)) {
-                size_t port_str = host.find(":");
-                port = host.substr(port_str + 1);
-                host = host.erase(port_str);
-            }
-            std::unique_lock<std::mutex> lk1(proxy.cache_mutex);
-            if (proxy.addr_cache.contain(host + port) && request->get_method() != "CONNECT") {
-                std::cout << "dns cache is working!\n";
-                auto addr = proxy.addr_cache.get(host + port);
-                lk1.unlock();
-                set_client_addr(std::move(addr));
-                connect_to_server();
-                make_request();
-            } else {
-                lk1.unlock();
-                std::cout << "push to resolve " << get_host() << request->get_URI() << "\n";
-                // TODO: can be replaced with std::make_unique
-                auto temp = std::unique_ptr<parse_state>(new parse_state(this));
-                state = temp.get();
-                proxy.resolve(std::move(temp));
-            }
+            std::cout << "push to resolve " << get_host() << request->get_URI() << "\n";
+            state = proxy.resolver.resolve(get_host(), [this](struct sockaddr addr)
+            {
+                set_client_addr(addr);
+                queue.trigger_user_event_handler(get_client_socket());
+            });
         }
     }
 }
@@ -309,10 +231,31 @@ void proxy_server::proxy_tcp_connection::CONNECT_on_read(struct kevent event)
     }
 }
 
+void proxy_server::proxy_tcp_connection::on_resolver_hostname(struct kevent event)
+{
+    std::cout << "host resolved \n";
+    connect_to_server();
+    if (request->get_method() == "CONNECT" ) {
+        write_to_client("HTTP/1.1 200 Connection established\r\n\r\n");
+        set_client_on_read_write(
+                                 [this](struct kevent event)
+                                 { CONNECT_on_read(event); },
+                                 [this](struct kevent event)
+                                 { client_on_write(event); });
+        set_server_on_read_write(
+                                 [this](struct kevent event)
+                                 { CONNECT_on_read(event); },
+                                 [this](struct kevent event)
+                                 { server_on_write(event); });
+    } else {
+        make_request();
+    }
+}
+
 void proxy_server::proxy_tcp_connection::make_request()
 {
     if (!request->is_validating() && proxy.cache.contain(request->get_host() + request->get_URI())) {
-        std::cout << "cache is working! for " << get_client_socket() << "\n"; // TODO: validate cache use if_match
+        std::cout << "cache is working! for " << get_client_socket() << "\n";
         const struct response& cache_response =  proxy.cache.get(request->get_host() + request->get_URI());
         request.reset(cache_response.get_validating_request(request->get_URI(), request->get_host()));
         set_server_on_read_write([this, cache_response](struct kevent event){
@@ -325,8 +268,13 @@ void proxy_server::proxy_tcp_connection::make_request()
                 timer.restart(queue.get_timer(), timeout);
                 char buff[event.data];
                 size_t size = recv(get_server_socket(), buff, event.data, 0);
-                if (size == -1)
-                    throw_error(errno, "recv()");
+                if (size == -1) {
+                    if (errno == EAGAIN) {
+                        return;
+                    } else {
+                        throw_error(errno, "recv()");
+                    }
+                }
                 if (response == nullptr) {
                     response.reset(new struct response({buff,size}));
                 } else {
@@ -366,8 +314,6 @@ void proxy_server::proxy_tcp_connection::make_request()
     }
     
     std::cout << "tcp_pair: client: " << get_client_socket() << " server: " << get_server_socket() << "\n";
-    
-    std::cout << request->get_request_text() << "\n";
     write_to_server(request->get_request_text());
     request.release();
 }
@@ -377,85 +323,5 @@ void proxy_server::proxy_tcp_connection::try_to_cache()
     if (response != nullptr && response->is_cacheable()) {
         std::cout << "add to cache: " << host + URI  <<  " " << response->get_header("ETag") << "\n";
         proxy.cache.put(host + URI, *response);
-    }
-}
-
-void proxy_server::resolver_thread_proc()
-{
-    // TODO: when this thread is stopped?
-    //       probably destructor of proxy_server blocks indefinetely
-    while (true) {
-        std::unique_lock<std::mutex> lk(queue_mutex);
-        queue_cond.wait(lk, [&]{return !host_names.empty();});
-
-        auto parse_ed = std::move(host_names.front());
-        host_names.pop_front();
-        lk.unlock();
-
-        std::string name;
-        {
-            std::unique_lock<std::mutex> lk1(state);
-            if (!parse_ed->canceled) {
-                name = parse_ed->connection->get_host();
-            } else {
-                parse_ed.release();
-                continue;
-            }
-        }
-
-        std::string port = "80";
-        if (name.find(":") != static_cast<size_t>(-1)) {
-            size_t port_str = name.find(":");
-            port = name.substr(port_str + 1);
-            name = name.erase(port_str);
-        }
-            
-        struct addrinfo hints, *res;
-
-        memset(&hints, 0, sizeof(hints));
-        hints.ai_family = AF_INET;
-        hints.ai_socktype = SOCK_STREAM;
-        hints.ai_flags = AI_NUMERICSERV;
-            
-//            name = "https://" + name + "/";
-            
-        int error = getaddrinfo(name.c_str(), port.c_str(), &hints, &res);
-        if (error) {
-            std::cout << name + ":" + port << "\n";
-            perror(gai_strerror(error));
-            continue;
-        }
-            
-        if (parse_ed->connection->request->get_method() == "CONNECT") {
-            freeaddrinfo(res);
-            hints.ai_flags = 0;
-            int error = getaddrinfo(name.c_str(), "https", &hints, &res);
-            if (error) {
-                std::cout << name + ":" + port << "\n";
-                perror(gai_strerror(error));
-                continue;
-            }
-        }
-            
-        sockaddr resolved = *(res->ai_addr);
-        freeaddrinfo(res);
-            
-        std::unique_lock<std::mutex> lk1(ans_mutex);
-        std::unique_lock<std::mutex> lk2(state);
-        std::unique_lock<std::mutex> lk3(cache_mutex);
-            if (!parse_ed->canceled) {
-                parse_ed->connection->set_client_addr(resolved);
-                addr_cache.put(name + port, resolved);
-            } else {
-                parse_ed.release();
-                continue;
-            }
-        ans.push_back(std::move(parse_ed));
-            queue.trigger_user_event_handler(USER_EVENT_IDENT);
-        lk3.unlock();
-        lk2.unlock();
-        lk1.unlock();
-
-        queue_cond.notify_one();
     }
 }

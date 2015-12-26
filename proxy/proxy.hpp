@@ -25,6 +25,7 @@
 #include "utils.hpp"
 #include "new_http_handler.hpp"
 #include "throw_error.h"
+#include "DNSresolver.hpp"
 #include "socket.hpp"
 
 uintptr_t const ident = 0x5c0276ef;
@@ -44,37 +45,19 @@ private:
     //       anywhere and not only in the proxy_server.
     //
     //       Also this change will simplify the proxy_server class significantly.
-    std::list<std::unique_ptr<parse_state>> host_names;
-    std::list<std::unique_ptr<parse_state>> ans;
-    std::condition_variable queue_cond;
-    std::mutex queue_mutex;
-    std::mutex ans_mutex;
-    std::mutex state;
-    std::mutex cache_mutex;
-    std::vector<std::thread> resolvers;
     
+    std::mutex resolved_mutex;
     server_socket server;
     io_queue& queue;
+    DNSresolver& resolver;
     
-    lru_cache<std::string, response> cache; // todo: <uri, cache ans>, cache ans should be a struct
-    lru_cache<std::string, sockaddr> addr_cache;
+    lru_cache<std::string, response> cache;
     
 public:
-    proxy_server(io_queue& queue, int port, size_t resolvers_num);
+    proxy_server(io_queue& queue, int port, DNSresolver& resolver);
     ~proxy_server();
 
-    void resolve(std::unique_ptr<parse_state> connection);
-
 private:
-    void resolver_thread_proc();
-
-    struct parse_state
-    {
-        parse_state(proxy_tcp_connection* connection) : connection(connection) {};
-        proxy_tcp_connection* connection;
-        bool canceled = false;
-    };
-    
     struct proxy_tcp_connection : tcp_connection
     {
         proxy_tcp_connection(proxy_server& proxy, io_queue& queue, tcp_client client);
@@ -89,18 +72,18 @@ private:
         void server_on_write(struct kevent event);
         void server_on_read(struct kevent event);
         void CONNECT_on_read(struct kevent event);
+        void on_resolver_hostname(struct kevent event);
         void make_request();
         void try_to_cache();
         
         std::unique_ptr<response> response;
         std::unique_ptr<request> request;
-        parse_state* state = nullptr;
+        resolve_state state;
         std::string host;
         std::string URI;
         sockaddr client_addr;
         timer_element timer;
         proxy_server& proxy;
-        bool revalidate = false;
     };
 };
 

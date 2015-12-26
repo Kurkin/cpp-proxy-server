@@ -19,7 +19,7 @@ void http::add_part(std::string const& part)
 
 void http::update_state()
 {
-    if (state == 0 && text.find("\r\n") != std::string::npos) {
+    if (state == DEF && text.find("\r\n") != std::string::npos) {
         state = FIRST_LINE;
         parse_first_line();
     }
@@ -55,11 +55,9 @@ void http::parse_headers()
 
 std::string const& http::get_header(std::string const& name) const
 {
-    if (headers.find(name) != headers.end()) {
-        auto value = headers.at(name);
-        return value;
-    }
-    return "";
+    if (headers.find(name) != headers.end())
+        return headers.at(name);
+    return empty_header;
 }
 
 void http::check_body()

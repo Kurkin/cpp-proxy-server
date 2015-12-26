@@ -9,16 +9,11 @@
 #ifndef new_http_handler_hpp
 #define new_http_handler_hpp
 
-// TODO: enum?
-#define BAD -1
-#define FIRST_LINE 1 // first line get, headers not full
-#define FULL_HEADERS 2 // headers get and request host ready to resolve
-#define PARTICAL_BODY 3
-#define FULL_BODY 4
-
 #include <iostream>
 #include <map>
 #include <string>
+
+enum STATE { DEF, BAD, FIRST_LINE, FULL_HEADERS, PARTICAL_BODY, FULL_BODY};
 
 struct http
 {
@@ -37,10 +32,11 @@ protected:
     void parse_headers();
     virtual void parse_first_line() = 0;
 
-    int state = 0;
+    STATE state = DEF;
     size_t body_start = 0;
     std::string text;
     std::map<std::string, std::string> headers;
+    std::string empty_header = ""; // remove
 };
 
 struct request : public http
