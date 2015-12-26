@@ -29,6 +29,7 @@ struct DNSresolver
     ~DNSresolver();
 
     resolve_state resolve(std::string const& host, callback_t callback);
+private:
     void resolver();
     
 private:
@@ -64,7 +65,7 @@ struct resolve_state
     void cancel();
     
 private:
-    std::unique_ptr<DNSresolver::request> request;
+    std::shared_ptr<DNSresolver::request> request;
 };
 
 

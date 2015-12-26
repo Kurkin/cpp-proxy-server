@@ -72,7 +72,7 @@ void DNSresolver::resolver()
             
             resolved = *(res->ai_addr);
             freeaddrinfo(res);
-            
+            std::unique_lock<std::mutex> lk2(cache_mutex);
             addr_cache.put(request->hostname + port, resolved);
         }
         
@@ -110,7 +110,9 @@ resolve_state::resolve_state(resolve_state&& other)
 }
 
 resolve_state::~resolve_state()
-{}
+{
+    cancel();
+}
 
 resolve_state& resolve_state::operator=(resolve_state &&other)
 {

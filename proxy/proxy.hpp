@@ -37,16 +37,6 @@ private:
     struct parse_state;
 
     std::map<proxy_tcp_connection*, std::unique_ptr<proxy_tcp_connection>> connections;
-
-    // TODO: Almost all of data members below have nothing to do with proxy server
-    //       and can be grouped together into a class called "resolver".
-    //       An important point is that this class should know nothing about
-    //       proxy_tcp_connection. This will allow the resolver class to be used
-    //       anywhere and not only in the proxy_server.
-    //
-    //       Also this change will simplify the proxy_server class significantly.
-    
-    std::mutex resolved_mutex;
     server_socket server;
     io_queue& queue;
     DNSresolver& resolver;

@@ -162,6 +162,7 @@ void proxy_server::proxy_tcp_connection::client_on_read(struct kevent event)
             std::cout << "push to resolve " << get_host() << request->get_URI() << "\n";
             state = proxy.resolver.resolve(get_host(), [this](struct sockaddr addr)
             {
+                // mutex??
                 set_client_addr(addr);
                 queue.trigger_user_event_handler(get_client_socket());
             });
