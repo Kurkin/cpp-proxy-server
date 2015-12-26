@@ -78,6 +78,25 @@ void DNSresolver::resolver()
         
         std::unique_lock<std::mutex> lk1(request->state_mutex);
         if (!request->canceled) {
+            // TODO: it is generally a bad practice to call callbacks
+            //       in a separate thread
+            // Rationale:
+            //       because a callback is called from separate thread
+            //       the code of callback must be multithreaded
+            //       and probably it has to lock some mutexes
+            //       'DNSResolver' call the callback holding the mutex 'state_mutex'
+            //       and the external code that uses it has some mutexes. It means
+            //       that the external code must be aware about existence of
+            //       mutex 'state_mutex' to prevent deadlocks.
+            //
+            //       In general if we call external code with some mutexes hold
+            //       these mutexes become a part of our public interface, not
+            //       an implementation detail
+            //
+            //       Avoid interfaces like this.
+            //
+            //       In this example it is possible to avoid this by queuing event
+            //       into kqueue and calling this callback from kqueue.
             request->callback(resolved);
         }
         
